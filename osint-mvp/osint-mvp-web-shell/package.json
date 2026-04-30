@@ -13,7 +13,8 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,json,md}\"",
     "test": "vitest run",
     "test:watch": "vitest",
-    "bootstrap:siblings": "node scripts/install-siblings.mjs"
+    "bootstrap:siblings": "node scripts/install-siblings.mjs",
+    "install-and-build": "pnpm bootstrap:siblings && pnpm install && pnpm build"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

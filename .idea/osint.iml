@@ -2,8 +2,18 @@
 <module type="JAVA_MODULE" version="4">
   <component name="NewModuleRootManager" inherit-compiler-output="true">
     <exclude-output />
-    <content url="file://$MODULE_DIR$" />
-    <orderEntry type="inheritedJdk" />
+    <content url="file://$MODULE_DIR$">
+      <excludeFolder url="file://$MODULE_DIR$/osint-auth-modules/osint-auth-backend/target" />
+      <excludeFolder url="file://$MODULE_DIR$/osint-core-modules/osint-web-core/node_modules" />
+      <excludeFolder url="file://$MODULE_DIR$/osint-gis-modules/osint-gis-web/node_modules" />
+      <excludeFolder url="file://$MODULE_DIR$/osint-intelligence-modules/osint-intelligence-web/node_modules" />
+      <excludeFolder url="file://$MODULE_DIR$/osint-mvp/osint-mvp-web-shell/dist" />
+      <excludeFolder url="file://$MODULE_DIR$/osint-mvp/osint-mvp-web-shell/node_modules" />
+      <excludeFolder url="file://$MODULE_DIR$/osint-search-modules/osint-search-web/node_modules" />
+      <excludeFolder url="file://$MODULE_DIR$/osint-tools/.tools" />
+      <excludeFolder url="file://$MODULE_DIR$/osint-video-modules/osint-video-web/node_modules" />
+    </content>
+    <orderEntry type="jdk" jdkName="temurin-21" jdkType="JavaSDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
 </module>
