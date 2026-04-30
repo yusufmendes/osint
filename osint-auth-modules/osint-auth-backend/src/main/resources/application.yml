@@ -1,0 +1,35 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: osint-auth-backend
+
+logging:
+  level:
+    com.osint.auth: INFO
+    org.springframework.security: INFO
+
+osint:
+  auth:
+    jwtSecret: dev-only-change-me-in-prod-must-be-32-bytes-long-at-least
+    jwtTtlMinutes: 60
+    cors:
+      allowedOrigins:
+        - http://localhost:5173
+        - http://localhost:4173
+    users:
+      - username: admin
+        password: admin123
+        permissions:
+          - gis.map.view
+          - gis.layers.view
+          - video.player.view
+          - intelligence.crud.view
+          - search.panel.view
+      - username: viewer
+        password: viewer123
+        permissions:
+          - gis.map.view
+          - video.player.view
+          - search.panel.view

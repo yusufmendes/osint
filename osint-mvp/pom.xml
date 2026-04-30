@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Ince Maven aggregator: yalnizca sibling repo'lardaki backend modullerini
+  bir araya getirir. Kendi <build>'i veya <dependencies>'i yok.
+  Sibling repo (osint-auth-modules) checkout edildigi surece `mvn` workspace
+  bazinda calisir; checkout edilmemis ise backend modulu kendi POM'uyla
+  bagimsiz olarak build edilebilir.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.osint</groupId>
+    <artifactId>osint-mvp-aggregator</artifactId>
+    <version>0.1.0</version>
+    <packaging>pom</packaging>
+
+    <name>osint-mvp aggregator</name>
+    <description>Ince Maven aggregator (osint-auth-backend sibling repo'su).</description>
+
+    <modules>
+        <module>../osint-auth-modules/osint-auth-backend</module>
+    </modules>
+</project>

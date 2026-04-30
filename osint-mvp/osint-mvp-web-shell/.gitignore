@@ -1,0 +1,9 @@
+node_modules/
+dist/
+target/
+.vscode/
+.idea/
+*.log
+.DS_Store
+.tsbuildinfo
+.vite
