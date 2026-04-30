@@ -14,7 +14,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "bootstrap:siblings": "node scripts/install-siblings.mjs",
-    "install-and-build": "pnpm bootstrap:siblings && pnpm install && pnpm build"
+    "install-and-build": "pnpm bootstrap:siblings && pnpm install && pnpm build",
+    "verify:sibling-watcher": "node scripts/verify-sibling-watcher.mjs",
+    "verify:hmr-ws": "node scripts/verify-hmr-ws.mjs"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
@@ -52,6 +54,7 @@
     "prettier": "^3.4.2",
     "typescript": "~5.7.2",
     "vite": "^7.3.2",
-    "vitest": "^3.0.0"
+    "vitest": "^3.0.0",
+    "ws": "^8.20.0"
   }
 }

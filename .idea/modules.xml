@@ -3,6 +3,12 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/osint.iml" filepath="$PROJECT_DIR$/.idea/osint.iml" />
+      <module fileurl="file://$PROJECT_DIR$/osint-gis-modules/osint-gis-web/osint-gis-web.iml" filepath="$PROJECT_DIR$/osint-gis-modules/osint-gis-web/osint-gis-web.iml" />
+      <module fileurl="file://$PROJECT_DIR$/osint-intelligence-modules/osint-intelligence-web/osint-intelligence-web.iml" filepath="$PROJECT_DIR$/osint-intelligence-modules/osint-intelligence-web/osint-intelligence-web.iml" />
+      <module fileurl="file://$PROJECT_DIR$/osint-mvp/osint-mvp-web-shell/osint-mvp-web-shell.iml" filepath="$PROJECT_DIR$/osint-mvp/osint-mvp-web-shell/osint-mvp-web-shell.iml" />
+      <module fileurl="file://$PROJECT_DIR$/osint-search-modules/osint-search-web/osint-search-web.iml" filepath="$PROJECT_DIR$/osint-search-modules/osint-search-web/osint-search-web.iml" />
+      <module fileurl="file://$PROJECT_DIR$/osint-video-modules/osint-video-web/osint-video-web.iml" filepath="$PROJECT_DIR$/osint-video-modules/osint-video-web/osint-video-web.iml" />
+      <module fileurl="file://$PROJECT_DIR$/osint-core-modules/osint-web-core/osint-web-core.iml" filepath="$PROJECT_DIR$/osint-core-modules/osint-web-core/osint-web-core.iml" />
     </modules>
   </component>
 </project>
