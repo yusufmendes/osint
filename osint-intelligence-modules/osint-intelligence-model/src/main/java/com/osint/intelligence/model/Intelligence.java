@@ -2,11 +2,7 @@ package com.osint.intelligence.model;
 
 import org.locationtech.jts.geom.Geometry;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Primary intelligence aggregate: narrative fields, spatial footprint, template link,
@@ -22,6 +18,8 @@ public class Intelligence {
     private long version;
     private String header;
     private String description;
+    private Date creationDate;
+    private Date lastModificationDate;
     private final List<String> keywords = new ArrayList<>();
     private final List<String> attachedFileUniqueIdList = new ArrayList<>();
     private Geometry location;
@@ -37,6 +35,8 @@ public class Intelligence {
             long version,
             String header,
             String description,
+            Date creationDate,
+            Date lastModificationDate,
             List<String> keywords,
             List<String> attachedFileUniqueIdList,
             Geometry location,
@@ -48,6 +48,8 @@ public class Intelligence {
         this.version = version;
         this.header = header;
         this.description = description;
+        this.creationDate = creationDate;
+        this.lastModificationDate = lastModificationDate;
         setKeywords(keywords);
         setAttachedFileUniqueIdList(attachedFileUniqueIdList);
         this.location = location;
@@ -180,5 +182,21 @@ public class Intelligence {
         if (map != null) {
             attributeIdToAttributeValueMap.putAll(map);
         }
+    }
+
+    public Date getCreationDate() {
+        return creationDate;
+    }
+
+    public void setCreationDate(Date creationDate) {
+        this.creationDate = creationDate;
+    }
+
+    public Date getLastModificationDate() {
+        return lastModificationDate;
+    }
+
+    public void setLastModificationDate(Date lastModificationDate) {
+        this.lastModificationDate = lastModificationDate;
     }
 }

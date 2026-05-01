@@ -133,13 +133,48 @@
        RESTRICTION: the glob-like pattern in the name attribute must have a "*"
        only at the start or the end.  -->
 
+    <!-- Intelligence static fields-->
+
+    <field name="name" type="string" indexed="true" stored="true" required="true" />
+    <field name="creationDate" type="pdate" indexed="true" stored="true" required="true"  />
+    <field name="lastModificationDate" type="pdate" indexed="true" stored="true" required="true"  />
+
+    <field name="attributeType" type="string" indexed="true" stored="true" required="true"  />
+    <field name="attributeValueTypeIdList" type="strings" indexed="true" stored="true"  />
+
+    <field name="childTemplateIdList" type="strings" indexed="true" stored="true"  />
+    <field name="attributeIdList" type="strings" indexed="true" stored="true"  />
+
+    <field name="value" type="string" indexed="true" stored="true"  />
+    <field name="attributeId" type="string" indexed="true" stored="true"  />
+
+    <field name="header" type="string" indexed="true" stored="true"  />
+    <field name="description" type="string" indexed="true" stored="true"  />
+    <field name="templateId" type="string" indexed="true" stored="true"  />
+    <field name="keywords" type="strings" indexed="true" stored="true"  />
+    <field name="attachedFileUniqueIdList" type="strings" indexed="true" stored="true"  />
+    <field name="location" type="location_rpt" indexed="true" stored="true"  />
+    <field name="relatedLocationList" type="location_rpt" indexed="true" stored="true" multiValued="true"  />
+    <field name="relatedIntelligenceIdList" type="strings" indexed="true" stored="true"  />
+    <!-- End of Intelligence static fields-->
+
+    <!-- Intelligence dynamic fields-->
+    <dynamicField name="*_s"   type="string"   indexed="true"  stored="true" />
+    <dynamicField name="*_l"   type="plong"    indexed="true"  stored="true"/>
+    <dynamicField name="*_b"   type="boolean"  indexed="true"  stored="true"/>
+    <dynamicField name="*_dt"  type="pdate"    indexed="true"  stored="true"/>
+    <dynamicField name="*_enum"   type="string"     indexed="true"  stored="true"/>
+    <dynamicField name="*_srpt"  type="location_rpt" indexed="true" stored="true"/>
+    <!-- End of Intelligence dynamic fields-->
+
+
     <dynamicField name="*_i"   type="pint"     indexed="true"  stored="true"/>
     <dynamicField name="*_is"  type="pints"    indexed="true"  stored="true"/>
-    <dynamicField name="*_s"   type="string"   indexed="true"  stored="true" />
+
     <dynamicField name="*_ss"  type="strings"  indexed="true"  stored="true"/>
     <dynamicField name="*_l"   type="plong"    indexed="true"  stored="true"/>
     <dynamicField name="*_ls"  type="plongs"   indexed="true"  stored="true"/>
-    <dynamicField name="*_b"   type="boolean"  indexed="true"  stored="true"/>
+
     <dynamicField name="*_bs"  type="booleans" indexed="true"  stored="true"/>
     <dynamicField name="*_f"   type="pfloat"   indexed="true"  stored="true"/>
     <dynamicField name="*_fs"  type="pfloats"  indexed="true"  stored="true"/>
@@ -157,7 +192,7 @@
     <dynamicField name="*_str" type="strings" stored="false" docValues="true" indexed="false" useDocValuesAsStored="false"/>
 
     <dynamicField name="*_p"  type="location" indexed="true" stored="true"/>
-    <dynamicField name="*_srpt"  type="location_rpt" indexed="true" stored="true"/>
+
 
     <!-- payloaded dynamic fields -->
     <dynamicField name="*_dpf" type="delimited_payloads_float" indexed="true"  stored="true"/>

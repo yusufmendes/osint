@@ -7,10 +7,7 @@ public enum AttributeType {
     STRING,
     NUMBER,
     BOOLEAN,
-    ENUM,
-    GEOMETRY,
     DATE,
-    ENUM_LIST,
-    GEOMETRY_LIST,
-    DATE_LIST
+    ENUM,
+    GEOMETRY
 }

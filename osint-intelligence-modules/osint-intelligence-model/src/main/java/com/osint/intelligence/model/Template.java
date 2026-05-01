@@ -2,6 +2,7 @@ package com.osint.intelligence.model;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -14,20 +15,26 @@ public class Template {
     private String id;
     private long version;
     private String name;
+    private Date creationDate;
+    private Date lastModificationDate;
     private final List<String> childTemplateIdList = new ArrayList<>();
     private final List<String> attributeIdList = new ArrayList<>();
+
 
     public Template() {}
 
     public Template(
             String id,
             long version,
-            String name,
+            String name,Date creationDate,
+            Date lastModificationDate,
             List<String> childTemplateIdList,
             List<String> attributeIdList) {
         this.id = id;
         this.version = version;
         this.name = name;
+        this.creationDate = creationDate;
+        this.lastModificationDate = lastModificationDate;
         setChildTemplateIdList(childTemplateIdList);
         setAttributeIdList(attributeIdList);
     }
@@ -96,5 +103,21 @@ public class Template {
         if (ids != null) {
             attributeIdList.addAll(ids);
         }
+    }
+
+    public Date getCreationDate() {
+        return creationDate;
+    }
+
+    public void setCreationDate(Date creationDate) {
+        this.creationDate = creationDate;
+    }
+
+    public Date getLastModificationDate() {
+        return lastModificationDate;
+    }
+
+    public void setLastModificationDate(Date lastModificationDate) {
+        this.lastModificationDate = lastModificationDate;
     }
 }

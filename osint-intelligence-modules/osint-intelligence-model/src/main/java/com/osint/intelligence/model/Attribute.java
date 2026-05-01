@@ -2,6 +2,7 @@ package com.osint.intelligence.model;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -22,6 +23,8 @@ public class Attribute {
     private String id;
     private long version;
     private String name;
+    private Date creationDate;
+    private Date lastModificationDate;
     private AttributeType attributeType;
     private final List<String> attributeValueTypeIdList = new ArrayList<>();
 
@@ -31,11 +34,15 @@ public class Attribute {
             String id,
             long version,
             String name,
+            Date creationDate,
+            Date lastModificationDate,
             AttributeType attributeType,
             List<String> attributeValueTypeIdList) {
         this.id = id;
         this.version = version;
         this.name = name;
+        this.creationDate = creationDate;
+        this.lastModificationDate = lastModificationDate;
         this.attributeType = attributeType;
         setAttributeValueTypeIdList(attributeValueTypeIdList);
     }
@@ -97,5 +104,21 @@ public class Attribute {
         if (ids != null) {
             attributeValueTypeIdList.addAll(ids);
         }
+    }
+
+    public Date getCreationDate() {
+        return creationDate;
+    }
+
+    public void setCreationDate(Date creationDate) {
+        this.creationDate = creationDate;
+    }
+
+    public Date getLastModificationDate() {
+        return lastModificationDate;
+    }
+
+    public void setLastModificationDate(Date lastModificationDate) {
+        this.lastModificationDate = lastModificationDate;
     }
 }
