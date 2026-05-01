@@ -1,0 +1,357 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  osint-intelligence-solr-server: Solr instance/conf provisioning + Docker
+  paketleme. Standalone (parent yok) — sibling osint-mvp aggregator olmadan
+  da bagimsiz `mvn` calistirilabilir.
+
+  Akis ozeti:
+    - Default build:
+        * Solr binary zip'i target/solr-${solr.version}/ altina unpack edilir.
+        * src/main/resources -> $SOLR_HOME/${solr.core.name}/conf altina senkron.
+        * `mvn exec:exec@solr-start` ve `@solr-stop` ile distro start/stop.
+    - `-Pseed-conf` profili: unpack edilmis distrodan _default/conf icerigi
+      src/main/resources/conf altina kopyalanir (tek seferlik baseline).
+    - `-Pdeployment` profili: shade jar + Dockerfile uzerinden docker imaji
+      build edilir; container icinde run-app.sh -> SolrCredentialFetcher ->
+      /tmp/solr-credentials -> Solr basliyor.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.osint.intelligence</groupId>
+    <artifactId>osint-intelligence-solr-server</artifactId>
+    <version>0.1.0</version>
+    <packaging>jar</packaging>
+
+    <name>osint-intelligence-solr-server</name>
+    <description>Intelligence modulu icin Solr core provisioning + start/stop + Docker paketi.</description>
+
+    <properties>
+        <java.version>21</java.version>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+        <solr.version>9.10.1</solr.version>
+        <solr.distro.dir>${project.build.directory}/solr-${solr.version}</solr.distro.dir>
+        <solr.core.name>intelligence</solr.core.name>
+        <solr.port>8983</solr.port>
+
+        <solr.bin>solr</solr.bin>
+
+        <docker.image.name>osint/intelligence-solr</docker.image.name>
+
+        <maven.compiler.plugin.version>3.13.0</maven.compiler.plugin.version>
+        <maven.shade.version>3.6.0</maven.shade.version>
+        <maven.antrun.version>3.1.0</maven.antrun.version>
+        <maven.exec.version>3.5.0</maven.exec.version>
+        <download.plugin.version>1.13.0</download.plugin.version>
+        <fabric8.dmp.version>0.46.0</fabric8.dmp.version>
+
+        <!--
+          Apache Solr binary distro URL'i (Maven Central yayinlamiyor; resmi
+          archive uzerinden cekilir). Solr 9.x serisi yalnizca .tgz olarak
+          yayinlanir, .zip yoktur. archive.apache.org tum eski surumleri
+          kalici tutar.
+        -->
+        <solr.distro.url>https://archive.apache.org/dist/solr/solr/${solr.version}/solr-${solr.version}.tgz</solr.distro.url>
+    </properties>
+
+    <build>
+        <finalName>osint-intelligence-solr-server</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>${maven.compiler.plugin.version}</version>
+                <configuration>
+                    <release>${java.version}</release>
+                </configuration>
+            </plugin>
+
+            <!--
+              Shade: SolrCredentialFetcher main'ini iceren tek bir
+              osint-intelligence-solr-server.jar. Docker imaji java -jar ... ile bunu calistirir.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>${maven.shade.version}</version>
+                <executions>
+                    <execution>
+                        <id>shade-jar</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <shadedArtifactAttached>false</shadedArtifactAttached>
+                            <transformers>
+                                <transformer
+                                        implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <manifestEntries>
+                                        <Main-Class>com.osint.intelligence.solr.config.SolrCredentialFetcher</Main-Class>
+                                        <Implementation-Title>${project.artifactId}</Implementation-Title>
+                                        <Implementation-Version>${project.version}</Implementation-Version>
+                                    </manifestEntries>
+                                </transformer>
+                            </transformers>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!--
+              Solr binary zip'i Apache resmi arsivinden indirip target altina acar.
+              Cache: ~/.m2/download-cache (maven session'lar arasi paylasilir).
+            -->
+            <plugin>
+                <groupId>com.googlecode.maven-download-plugin</groupId>
+                <artifactId>download-maven-plugin</artifactId>
+                <version>${download.plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>fetch-solr-distro</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>wget</goal>
+                        </goals>
+                        <configuration>
+                            <skip>${unpack.solr.skip}</skip>
+                            <url>${solr.distro.url}</url>
+                            <unpack>true</unpack>
+                            <outputDirectory>${project.build.directory}</outputDirectory>
+                            <skipCache>false</skipCache>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!--
+              antrun:
+                - sync-home (process-resources): src/main/resources/conf -> $SOLR_HOME/${solr.core.name}/conf
+                  Sadece config dosyalarini kopyalar; data/ ve indeks dosyalari korunur.
+                - seed-conf (no phase, sadece -Pseed-conf ile): unpack edilmis _default/conf
+                  iceriklerini src/main/resources/conf altina aktarir (baseline).
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>${maven.antrun.version}</version>
+                <executions>
+                    <execution>
+                        <id>sync-home</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <skip>${sync.home.skip}</skip>
+                            <target>
+                                <property environment="env"/>
+                                <fail message="SOLR_HOME ortam degiskeni tanimli degil. Ornek: setx SOLR_HOME D:\solr-home (Windows) veya export SOLR_HOME=$HOME/solr-home (unix). Senkronu atlamak icin: -Dsync.home.skip=true">
+                                    <condition>
+                                        <not>
+                                            <isset property="env.SOLR_HOME"/>
+                                        </not>
+                                    </condition>
+                                </fail>
+                                <fail message="src/main/resources/conf bos. Once: mvn process-resources -Pseed-conf">
+                                    <condition>
+                                        <not>
+                                            <available file="${project.basedir}/src/main/resources/conf/solrconfig.xml"/>
+                                        </not>
+                                    </condition>
+                                </fail>
+                                <mkdir dir="${env.SOLR_HOME}/${solr.core.name}/conf"/>
+                                <copy todir="${env.SOLR_HOME}/${solr.core.name}/conf" overwrite="true">
+                                    <fileset dir="${project.basedir}/src/main/resources/conf">
+                                        <include name="**/*"/>
+                                    </fileset>
+                                </copy>
+                                <copy file="${project.basedir}/src/main/resources/core.properties"
+                                      tofile="${env.SOLR_HOME}/${solr.core.name}/core.properties"
+                                      overwrite="true"/>
+                                <copy file="${solr.distro.dir}/server/solr/solr.xml"
+                                      tofile="${env.SOLR_HOME}/solr.xml"
+                                      overwrite="false"/>
+                                <echo message="[sync-home] ${project.basedir}/src/main/resources -> ${env.SOLR_HOME}/${solr.core.name} (data korundu)"/>
+                            </target>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>seed-conf</id>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <skip>true</skip>
+                            <target>
+                                <fail message="Seed kaynagi yok: ${solr.distro.dir}/server/solr/configsets/_default/conf. Once: mvn process-resources">
+                                    <condition>
+                                        <not>
+                                            <available file="${solr.distro.dir}/server/solr/configsets/_default/conf/solrconfig.xml"/>
+                                        </not>
+                                    </condition>
+                                </fail>
+                                <copy todir="${project.basedir}/src/main/resources/conf" overwrite="true">
+                                    <fileset dir="${solr.distro.dir}/server/solr/configsets/_default/conf">
+                                        <include name="**/*"/>
+                                    </fileset>
+                                </copy>
+                                <echo message="[seed-conf] _default/conf -> src/main/resources/conf"/>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!--
+              exec:
+                - solr-start: ${solr.distro.dir}/bin/${solr.bin} start -p $port -s $SOLR_HOME
+                - solr-stop:  ${solr.distro.dir}/bin/${solr.bin} stop  -p $port
+              Phase'e bagli degil; explicit cagri:
+                mvn exec:exec@solr-start
+                mvn exec:exec@solr-stop
+            -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>${maven.exec.version}</version>
+                <executions>
+                    <execution>
+                        <id>solr-start</id>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>${solr.distro.dir}/bin/${solr.bin}</executable>
+                            <workingDirectory>${solr.distro.dir}</workingDirectory>
+                            <arguments>
+                                <argument>start</argument>
+                                <argument>-p</argument>
+                                <argument>${solr.port}</argument>
+                                <argument>-s</argument>
+                                <argument>${env.SOLR_HOME}</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>solr-stop</id>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>${solr.distro.dir}/bin/${solr.bin}</executable>
+                            <workingDirectory>${solr.distro.dir}</workingDirectory>
+                            <arguments>
+                                <argument>stop</argument>
+                                <argument>-p</argument>
+                                <argument>${solr.port}</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+    <profiles>
+        <!-- Windows uzerinde solr.cmd binary -->
+        <profile>
+            <id>windows</id>
+            <activation>
+                <os>
+                    <family>windows</family>
+                </os>
+            </activation>
+            <properties>
+                <solr.bin>solr.cmd</solr.bin>
+            </properties>
+        </profile>
+
+        <!--
+          seed-conf: distrodan _default/conf icerigini src/main/resources/conf altina
+          aktarir. Calistirma:
+              mvn process-resources -Pseed-conf
+        -->
+        <profile>
+            <id>seed-conf</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-antrun-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>seed-conf</id>
+                                <phase>process-resources</phase>
+                                <goals>
+                                    <goal>run</goal>
+                                </goals>
+                                <configuration>
+                                    <skip>false</skip>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>sync-home</id>
+                                <configuration>
+                                    <skip>true</skip>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!--
+          deployment: Docker imaji build eder. Yerel SOLR_HOME senkronu ve
+          distro unpack atlanir. Imaj icinde run-app.sh -> SolrCredentialFetcher
+          -> /tmp/solr-credentials -> Solr akisi calisir.
+        -->
+        <profile>
+            <id>deployment</id>
+            <properties>
+                <unpack.solr.skip>true</unpack.solr.skip>
+                <sync.home.skip>true</sync.home.skip>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>io.fabric8</groupId>
+                        <artifactId>docker-maven-plugin</artifactId>
+                        <version>${fabric8.dmp.version}</version>
+                        <configuration>
+                            <images>
+                                <image>
+                                    <name>${docker.image.name}:${project.version}</name>
+                                    <build>
+                                        <contextDir>${project.basedir}</contextDir>
+                                        <dockerFile>Dockerfile</dockerFile>
+                                        <args>
+                                            <SOLR_VERSION>${solr.version}</SOLR_VERSION>
+                                            <SOLR_CORE_NAME>${solr.core.name}</SOLR_CORE_NAME>
+                                        </args>
+                                    </build>
+                                </image>
+                            </images>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>docker-build</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>build</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+</project>
