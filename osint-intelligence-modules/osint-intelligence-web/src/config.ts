@@ -1,8 +1,8 @@
 /**
- * osint-intelligence-web modulunun ic davranis ve dis dunya ayarlari.
- * Modulun "config.ts" sozlesmesi: tum remote endpoint ve modul-icin
- * sabitler bu dosyada toplanir. Build-time env (Vite) `import.meta.env`'den
- * okunur, calisma zamani override icin window'a duzeltici eklenebilir.
+ * Internal behavior and external settings for `osint-intelligence-web`.
+ * The module `config.ts` contract: all remote endpoints and module-wide
+ * constants live here. Build-time env (Vite) is read from `import.meta.env`;
+ * runtime overrides may be wired via `window` later.
  */
 const env = (import.meta as { env?: Record<string, string | undefined> }).env ?? {};
 

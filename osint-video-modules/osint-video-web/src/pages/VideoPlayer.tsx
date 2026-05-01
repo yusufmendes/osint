@@ -19,11 +19,11 @@ export default function VideoPlayer() {
   return (
     <section style={{ padding: 24 }}>
       <h1>
-        Merhaba {root.shell.dummy} + {root.gis.dummy} + {root.video.dummy} + {root.intelligence.dummy} + {root.search.dummy}
+        Hello {root.shell.dummy} + {root.gis.dummy} + {root.video.dummy} + {root.intelligence.dummy} + {root.search.dummy}
       </h1>
       <h2>Video Player</h2>
-      <p>HLS player iskeleti — boş scaffold.</p>
-      {intel.data && <p>Cross-module: intelligence toplam {intel.data.total}</p>}
+      <p>HLS player skeleton — empty scaffold.</p>
+      {intel.data && <p>Cross-module: intelligence total {intel.data.total}</p>}
     </section>
   );
 }

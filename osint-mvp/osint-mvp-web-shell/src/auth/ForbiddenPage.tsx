@@ -7,12 +7,12 @@ interface Props {
 export function ForbiddenPage({ missing }: Props) {
   return (
     <Box sx={{ p: 4 }}>
-      <Typography variant="h4" gutterBottom>403 — Yetkisiz</Typography>
+      <Typography variant="h4" gutterBottom>403 — Forbidden</Typography>
       <Alert severity="warning">
-        Bu sayfayı görüntülemek için yetkiniz yok.
+        You do not have permission to view this page.
         {missing && missing.length > 0 && (
           <Box mt={1}>
-            <strong>Eksik permission'lar:</strong> {missing.join(', ')}
+            <strong>Missing permissions:</strong> {missing.join(', ')}
           </Box>
         )}
       </Alert>

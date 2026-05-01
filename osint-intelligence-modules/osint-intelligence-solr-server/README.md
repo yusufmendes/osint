@@ -1,39 +1,37 @@
 # osint-intelligence-solr-server
 
-Intelligence modulu icin Solr `intelligence` core'unu yerelde veya Docker'da
-calistirmak icin build ve run direktifleri.
+Build and run instructions for the Solr `intelligence` core used by the Intelligence module, locally or in Docker.
 
-Tasarim, Maven plugin akislari ve Docker ic mekanizmasi icin bkz.
-[DesignAndImplementationDetail.md](DesignAndImplementationDetail.md).
+For design, Maven plugin flows, and Docker internals, see [DesignAndImplementationDetail.md](DesignAndImplementationDetail.md).
 
-## Gereksinimler
+## Requirements
 
-- **Java 21** (ornek: repo kokunden `osint-tools` izole toolchain)
+- **Java 21** (example: isolated toolchain from repo root `osint-tools`)
 
   ```powershell
   cd D:\osint
   . .\osint-tools\env.ps1
-  java -version   # 21.x beklenir
+  java -version   # expect 21.x
   mvn -version
   ```
 
 - **Maven 3.9+**
-- **Ag erisimi** (ilk build'de Solr `.tgz` arsivden indirilir; cache kullanilir)
-- **Docker** (yalniz `-Pdeployment` ile imaj build edeceksen)
+- **Network** (first build downloads the Solr `.tgz` from the archive; a cache is used)
+- **Docker** (only if you build the image with `-Pdeployment`)
 
-## Hizli baslangic (yerel)
+## Quick start (local)
 
-### 1. `SOLR_HOME` (kalici veri ve instance)
+### 1. `SOLR_HOME` (persistent data and instance)
 
-`SOLR_HOME`, core ve indekslerin tutuldugu dizindir; `mvn clean` bunu silmez.
+`SOLR_HOME` is the directory where the core and indexes live; `mvn clean` does **not** remove it.
 
-PowerShell (kalici, yeni oturumlar icin):
+PowerShell (persistent, for new sessions):
 
 ```powershell
 setx SOLR_HOME "D:\path\to\solr-home"
 ```
 
-Mevcut oturum icin:
+Current session only:
 
 ```powershell
 $env:SOLR_HOME = "D:\path\to\solr-home"
@@ -45,103 +43,89 @@ bash/zsh:
 export SOLR_HOME="$HOME/solr-home"
 ```
 
-### 2. Bir kerelik: distrodan `conf/` baseline
+### 2. One-time: `conf/` baseline from the distro
 
-Apache Solr 9.x binary yalnizca `.tgz` olarak yayinlanir. Asagidaki komut
-distroyu indirip acar ve `server/solr/configsets/_default/conf` icerigini
-`src/main/resources/conf/` altina kopyalar (repoya commit edilebilir).
+Apache Solr 9.x ships only as a `.tgz`. The command below downloads and unpacks the distro and copies `server/solr/configsets/_default/conf` into `src/main/resources/conf/` (suitable to commit).
 
 ```powershell
 cd D:\osint\osint-intelligence-modules\osint-intelligence-solr-server
 mvn process-resources -Pseed-conf
 ```
 
-### 3. Build (jar + distro unpack + `SOLR_HOME` senkronu)
+### 3. Build (jar + distro unpack + `SOLR_HOME` sync)
 
 ```powershell
 mvn package
 ```
 
-- `SOLR_HOME` tanimli degilse build, `process-resources` sirasinda hata verir
-  (fail-fast). Gecici olarak senkronu atlamak icin:
-  `mvn package -Dsync.home.skip=true`
-- `src/main/resources/conf/solrconfig.xml` yoksa once `seed-conf` adimini
-  calistir.
+- If `SOLR_HOME` is not set, the build fails at `process-resources` (fail-fast). To skip sync temporarily: `mvn package -Dsync.home.skip=true`
+- If `src/main/resources/conf/solrconfig.xml` is missing, run the `seed-conf` step first.
 
-### 4. Solr baslat / durdur
+### 4. Start / stop Solr
 
 ```powershell
 mvn exec:exec@solr-start
 mvn exec:exec@solr-stop
 ```
 
-- Windows'ta POM otomatik olarak `solr.cmd` kullanir.
-- Varsayilan port: **8983** (`solr.port` ile degistirilebilir).
+- On Windows the POM automatically uses `solr.cmd`.
+- Default port: **8983** (override with `solr.port`).
 
-### 5. Dogrulama
+### 5. Smoke checks
 
-Tarayici veya HTTP istemcisi:
+Browser or HTTP client:
 
 - Admin: `http://localhost:8983/solr/admin/info/system`
 - Core: `http://localhost:8983/solr/intelligence/select?q=*:*&wt=json`
 
-## Docker (deployment profili)
+## Docker (deployment profile)
 
-Shade jar + `Dockerfile` ile imaj build:
+Build the shaded jar + `Dockerfile` image:
 
 ```powershell
 mvn -Pdeployment package
 ```
 
-Varsayilan imaj adi: `osint-intelligence-solr-server:0.1.0` (`docker.image.name` ve
-`project.version` ile uyumlu).
+Default image name: `osint-intelligence-solr-server:0.1.0` (aligned with `docker.image.name` and `project.version`).
 
-Calistirma:
+Run:
 
 ```powershell
 docker run -p 8983:8983 osint-intelligence-solr-server:0.1.0
 ```
 
-Container icinde `run-app.sh` once credential jar'ini **Dockerfile ile eklenen
-Java 21 JRE** (`JAVA_CREDENTIALS`, varsayilan `/opt/osint/jre-21/bin/java`)
-ile calistirir; Solr ise resmi imajin JVM'i ile `solr-foreground` uzerinden
-baslar. Ayrintilar [DesignAndImplementationDetail.md](DesignAndImplementationDetail.md).
+Inside the container, `run-app.sh` runs the credential jar with the **Java 21 JRE added by the Dockerfile** (`JAVA_CREDENTIALS`, default `/opt/osint/jre-21/bin/java`); Solr itself starts via `solr-foreground` using the official image JVM. Details: [DesignAndImplementationDetail.md](DesignAndImplementationDetail.md).
 
-**Not:** `UnsupportedClassVersionError` (61 vs 65) gorursen imaji bu Dockerfile
-ile yeniden build et; eski imajda Java 21 JRE katmani yoktur.
+**Note:** If you see `UnsupportedClassVersionError` (61 vs 65), rebuild the image with this Dockerfile; older images do not include the Java 21 layer.
 
-## Ozet komut tablosu
+## Command cheat sheet
 
-| Amac | Komut |
-|------|--------|
-| Conf baseline (bir kerelik) | `mvn process-resources -Pseed-conf` |
-| Tam build + `SOLR_HOME` sync | `mvn package` |
-| Senkronu atla | `mvn package -Dsync.home.skip=true` |
-| Solr baslat | `mvn exec:exec@solr-start` |
-| Solr durdur | `mvn exec:exec@solr-stop` |
-| Docker imaji | `mvn -Pdeployment package` |
+| Goal | Command |
+|------|---------|
+| Conf baseline (one-time) | `mvn process-resources -Pseed-conf` |
+| Full build + `SOLR_HOME` sync | `mvn package` |
+| Skip sync | `mvn package -Dsync.home.skip=true` |
+| Start Solr | `mvn exec:exec@solr-start` |
+| Stop Solr | `mvn exec:exec@solr-stop` |
+| Docker image | `mvn -Pdeployment package` |
 
-## Maven property ozeti
+## Maven properties
 
-| Property | Varsayilan | Aciklama |
-|----------|------------|----------|
-| `solr.version` | `9.10.1` | Distro indirme + Docker `FROM solr:...` |
-| `solr.core.name` | `intelligence` | Core adi |
-| `solr.port` | `8983` | Yerel start/stop portu |
-| `docker.image.name` | `osint-intelligence-solr-server` | Docker imaj adi |
+| Property | Default | Description |
+|----------|---------|-------------|
+| `solr.version` | `9.10.1` | Distro download + Docker `FROM solr:...` |
+| `solr.core.name` | `intelligence` | Core name |
+| `solr.port` | `8983` | Local start/stop port |
+| `docker.image.name` | `osint-intelligence-solr-server` | Docker image name |
 
-## Frontend ile uyum
+## Frontend alignment
 
-`osint-intelligence-web` varsayilan Solr URL'si:
+`osint-intelligence-web` default Solr URL:
 
-`http://localhost:8983/solr/intelligence` — core adi `intelligence` ile
-eslesmelidir.
+`http://localhost:8983/solr/intelligence` — the core name must stay `intelligence`.
 
-## Sorun giderme
+## Troubleshooting
 
-- **`SOLR_HOME ... not found` (stop):** Stop komutu icin de ayni oturumda
-  `$env:SOLR_HOME` set edilmeli; `setx` sonrasi yeni shell ac.
-- **Ilk `solr-start` uzun surer:** `exec-maven-plugin` ve Solr ilk kez
-  indirilir / JVM ayaga kalkar; sonraki calismalar daha hizli olur.
-- **Port mesgul:** Baska bir Solr 8983'te ise `solr.port` property'sini
-  degistir veya diger sureci durdur.
+- **`SOLR_HOME ... not found` (stop):** Set `$env:SOLR_HOME` in the same session for stop; after `setx`, open a new shell.
+- **First `solr-start` is slow:** `exec-maven-plugin` and Solr may download / cold-start the JVM; later runs are faster.
+- **Port in use:** If another process uses 8983, change `solr.port` or stop the other process.

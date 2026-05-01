@@ -1,72 +1,72 @@
 # Modern ISR Web — Initial Implementation (Intelligence, GIS, Video, Search)
 
-Bu doküman, projenin **ilk iskeletinin** nasıl kurulacağını tanımlar: kullanılacak kütüphaneler, **shell + dört domain web modülü** (intelligence, gis, video, search), ortak `**osint-web-core`** kütüphanesi, multi-repo tooling (sekiz bağımsız git reposu, pnpm `file:` protokolüyle dosya sistemi seviyesinde sembolik bağlanır; ortak izole toolchain `osint-tools/` reposunda), **MVP auth** (`osint-auth-backend` + JWT), tek RTK store + modül slice'ları, TanStack Query ve manifest tabanlı routing.
+This document defines how to set up the **initial skeleton** of the project: libraries to use, **shell + four domain web modules** (intelligence, gis, video, search), the shared `**osint-web-core`** library, multi-repo tooling (eight independent git repos linked at filesystem level via pnpm `file:` protocol; shared isolated toolchain in the `osint-tools/` repo), **MVP auth** (`osint-auth-backend` + JWT), a single RTK store + module slices, TanStack Query, and manifest-based routing.
 
 ---
 
-## 1) Kullanılacak Framework ve Kütüphaneler
+## 1) Framework and Libraries to Use
 
 
-| Katman             | Seçim                       |
+| Layer              | Choice                      |
 | ------------------ | --------------------------- |
 | UI Framework       | **React**                   |
-| UI Component Kit   | **MUI** (kurumsal UI kit)   |
+| UI Component Kit   | **MUI** (enterprise UI kit) |
 | JS Type System     | **TypeScript**              |
 | Dev/Build Tool     | **Vite**                    |
 | Client State       | **Redux Toolkit (RTK)**     |
 | Server State       | **TanStack Query**          |
 | Router             | **TanStack Router**         |
-| 3D GIS             | **CesiumJS** (ana 3D globe) |
+| 3D GIS             | **CesiumJS** (main 3D globe) |
 | Backend JDK        | **Java 21** (LTS)           |
 | Backend Framework  | **Spring Boot 4.0.6**       |
 | Backend Build Tool | **Apache Maven 3.9.15**     |
 
 
-**Sürüm kuralı**
+**Version rule**
 
-- Yukarıdaki kütüphanelerin birbirleriyle uyum problemi olmayacak şekilde **en güncel stabil** sürümleri indirilip kurulacak.
-- Şu anki boş (scaffold) implementasyonda GIS kütüphaneleri henüz kullanılmıyor olsa da `**osint-gis-web` içine tüm GIS kütüphaneleri eklenecek**.
-- Her modülde ortak kullanılacak olan **React, MUI, TypeScript, RTK, TanStack Query** ve **Vite** paketleri `package.json` içine baştan eklenecek.
+- The **latest stable** versions of the libraries above will be installed so they work together without compatibility issues.
+- Although GIS libraries are not yet used in the current empty (scaffold) implementation, **all GIS libraries will be added to `**osint-gis-web`**.
+- **React, MUI, TypeScript, RTK, TanStack Query**, and **Vite** packages shared across every module will be added to `package.json` from the start.
 
 ---
 
-## 2) Shell Uygulaması ve Modüllerin Oluşturulması
+## 2) Shell Application and Creating Modules
 
-Proje, **1 shell uygulaması**, **4 domain web modülü** ve **1 ortak kütüphane** paketinden oluşur.
+The project consists of **1 shell application**, **4 domain web modules**, and **1 shared** library package.
 
 **Shell**
 
-- `osint-mvp-web-shell` — çatı uygulama (layout, auth, routing, global RTK store, global QueryClient). Domain yeteneği barındırmaz; modülleri import edip render eder. Klasör: `osint-mvp/osint-mvp-web-shell/` (kendi git reposu).
+- `osint-mvp-web-shell` — shell application (layout, auth, routing, global RTK store, global QueryClient). It does not host domain capabilities; it imports modules and renders them. Folder: `osint-mvp/osint-mvp-web-shell/` (its own git repo).
 
-**Domain modülleri**
+**Domain modules**
 
-- `osint-intelligence-web` — Intelligence modülü. Klasör: `osint-intelligence-modules/`
-- `osint-gis-web` — GIS modülü. Klasör: `osint-gis-modules/`
-- `osint-video-web` — Video modülü. Klasör: `osint-video-modules/`
-- `osint-search-web` — Search modülü. Klasör: `osint-search-modules/`
+- `osint-intelligence-web` — Intelligence module. Folder: `osint-intelligence-modules/`
+- `osint-gis-web` — GIS module. Folder: `osint-gis-modules/`
+- `osint-video-web` — Video module. Folder: `osint-video-modules/`
+- `osint-search-web` — Search module. Folder: `osint-search-modules/`
 
-**Ortak kütüphane**
+**Shared library**
 
-- `osint-web-core` — Ortak tipler ve yardımcılar (`AppModule`, `RootState`, ...). Klasör: `osint-core-modules/`
+- `osint-web-core` — Shared types and helpers (`AppModule`, `RootState`, ...). Folder: `osint-core-modules/`
 
-> İsimlendirme, backend tarafındaki `osint-<domain>-backend` kalıbıyla simetrik tutulmuştur (`osint-gis-web` ↔ `osint-gis-backend`).
-> **Klasör / repo kuralı**: Her `osint-*-modules/` üst klasörü **bağımsız bir git reposu**dur ve içinde **bir** paket barındırır (örn. `osint-gis-modules/osint-gis-web/`); shell de `osint-mvp/` reposunun altında `osint-mvp-web-shell/` paketi olarak yaşar; ortak kütüphaneler `osint-core-modules/<paket>/` altındadır. `-modules` çoğulu, ileride aynı alan altında ek paket barındırma esnekliği için bilinçli olarak korunur (örn. `osint-gis-modules/osint-gis-map-kit/` veya `osint-core-modules/osint-backend-core/`).
+> Naming is kept symmetric with the backend `osint-<domain>-backend` pattern (`osint-gis-web` ↔ `osint-gis-backend`).
+> **Folder / repo rule**: Each `osint-*-modules/` top folder is an **independent git repo** and hosts **one** package (e.g. `osint-gis-modules/osint-gis-web/`); the shell also lives as the `osint-mvp-web-shell/` package under the `osint-mvp/` repo; shared libraries sit under `osint-core-modules/<package>/`. The `-modules` plural is deliberately kept for flexibility to host additional packages under the same area later (e.g. `osint-gis-modules/osint-gis-map-kit/` or `osint-core-modules/osint-backend-core/`).
 
-**Kurallar**
+**Rules**
 
-- Shell domain yeteneği içermez; yalnızca modülleri yükler, manifest'lerini işler ve ortak altyapıyı (store, query client, router, tema) sağlar.
-- Her modül, **kendi menülerini ve route'larını** bir **manifest** üzerinden **dinamik** olarak tanımlar.
-- Her modülün içinde bir `**config.ts`** dosyası bulunur. Bu dosya:
-  - modülün kendi **iç davranış ayarları**nı,
-  - **dış dünya / remote server / servis adresleri** gibi erişim bilgilerini
-  tek yerden yönetir.
-- Ortak tipler (ör. `AppModule`, `RootState`) `**osint-web-core`** paketinde tutulur; shell ve tüm modüller oradan import eder.
+- The shell contains no domain capability; it only loads modules, processes their manifests, and provides shared infrastructure (store, query client, router, theme).
+- Each module **dynamically** defines **its own menus and routes** via a **manifest**.
+- Each module contains a `**config.ts**` file. That file:
+  - manages the module’s own **internal behavior settings**,
+  - and **access information** such as **external / remote server / service URLs**
+  in one place.
+- Shared types (e.g. `AppModule`, `RootState`) live in the `**osint-web-core`** package; the shell and all modules import from there.
 
 ---
 
-## 3) Modül Manifest Örnekleri
+## 3) Module Manifest Examples
 
-> Aşağıdaki örnekler her modülün kendi `src/index.ts` dosyasında `AppModule` tipinde bir manifest export ettiğini gösterir. Ana uygulama bu manifest’leri tarar, menüyü ve route’ları **dinamik olarak** kurar.
+> The examples below show each module exporting an `AppModule`-typed manifest from its own `src/index.ts`. The main app scans these manifests and builds the menu and routes **dynamically**.
 
 ### 3.1. `osint-gis-modules/osint-gis-web/src/index.ts`
 
@@ -74,7 +74,7 @@ Proje, **1 shell uygulaması**, **4 domain web modülü** ve **1 ortak kütüpha
 import { lazy } from 'react';
 import type { AppModule } from 'osint-web-core';
 
-// Her sayfa kendi chunk'ına gidiyor
+// Each page goes to its own chunk
 const MapPage    = lazy(() => import('./pages/MapPage'));
 const LayersPage = lazy(() => import('./pages/LayersPage'));
 
@@ -83,8 +83,8 @@ export const gisModule: AppModule = {
   title: 'GIS',
   permissions: ['gis.map.view', 'gis.layers.view'],
   menu: [
-    { path: '/gis/map',    label: 'Harita',    permissions: ['gis.map.view'] },
-    { path: '/gis/layers', label: 'Katmanlar', permissions: ['gis.layers.view'] },
+    { path: '/gis/map',    label: 'Map',    permissions: ['gis.map.view'] },
+    { path: '/gis/layers', label: 'Layers', permissions: ['gis.layers.view'] },
   ],
   routes: [
     { path: '/gis/map',    element: <MapPage />,    permissions: ['gis.map.view'] },
@@ -106,7 +106,7 @@ export const intelligenceModule: AppModule = {
   title: 'Intelligence',
   permissions: ['intelligence.crud.view'],
   menu: [
-    { path: '/intelligence/crud', label: 'İstihbarat Yarat',   permissions: ['intelligence.crud.view'] },
+    { path: '/intelligence/crud', label: 'Create Intelligence',   permissions: ['intelligence.crud.view'] },
   ],
   routes: [
     { path: '/intelligence/crud', element: <IntelligenceCrudPage />, permissions: ['intelligence.crud.view'] },
@@ -148,7 +148,7 @@ export const searchModule: AppModule = {
   title: 'Search',
   permissions: ['search.panel.view'],
   menu: [
-    { path: '/search/panel', label: 'Arama', permissions: ['search.panel.view'] },
+    { path: '/search/panel', label: 'Search', permissions: ['search.panel.view'] },
   ],
   routes: [
     { path: '/search/panel', element: <SearchPage />, permissions: ['search.panel.view'] },
@@ -158,26 +158,26 @@ export const searchModule: AppModule = {
 
 ---
 
-## 4) RTK Store — Tek Store, Modül Slice'ları
+## 4) RTK Store — Single Store, Module Slices
 
-**Mimari**
+**Architecture**
 
-- Shell **tek bir global RTK store** kurar (`configureStore`).
-- **Slice sahipliği modüldedir**: her web modülü kendi slice'ını (`gisSlice`, `videoSlice`, `intelligenceSlice`, `searchSlice`) ve reducer'ını export eder.
-- Shell, modüllerden gelen reducer'ları birleştirerek store'u oluşturur. Shell'in de küçük bir `shellSlice`'ı vardır (layout, aktif menü vb.).
-- Tek store → tek DevTools, tek middleware zinciri, tek `RootState` tipi, tutarlı time-travel/persist.
+- The shell sets up **one global RTK store** (`configureStore`).
+- **Slice ownership is in the module**: each web module exports its own slice (`gisSlice`, `videoSlice`, `intelligenceSlice`, `searchSlice`) and reducer.
+- The shell combines reducers from modules to build the store. The shell also has a small `shellSlice` (layout, active menu, etc.).
+- Single store → single DevTools, single middleware chain, single `RootState` type, consistent time-travel/persist.
 
-**Dummy alan demosu (kurulumun doğru çalıştığının kanıtı)**
+**Dummy field demo (proof the setup works)**
 
-- Her slice, `dummy: string` alanıyla başlar: `shell-hello`, `gis-hello`, `video-hello`, `intel-hello`, `search-hello`.
-- Her modülün bir sayfası render olduğunda **beş dummy'yi de** `useSelector` ile okuyup concat eder:
-`Merhaba {shell} + {gis} + {video} + {intel} + {search}`
-- Bu demo şunu kanıtlar:
-  - Tek store doğru kurulmuş.
-  - Modüller birbirlerinin state'ine selector üzerinden erişebiliyor.
-  - İleride modüller kendi iş slice'larını aynı pattern ile ekleyebilir.
+- Each slice starts with a `dummy: string` field: `shell-hello`, `gis-hello`, `video-hello`, `intel-hello`, `search-hello`.
+- When a page in each module renders, it reads **all five dummies** with `useSelector` and concatenates:
+`Hello {shell} + {gis} + {video} + {intel} + {search}`
+- This demo proves:
+  - The single store is wired correctly.
+  - Modules can read each other’s state via selectors.
+  - Later, modules can add their own business slices using the same pattern.
 
-**Örnek: modül slice'ı** (`osint-gis-modules/osint-gis-web/src/store/gisSlice.ts`)
+**Example: module slice** (`osint-gis-modules/osint-gis-web/src/store/gisSlice.ts`)
 
 ```ts
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
@@ -194,7 +194,7 @@ export const { setDummy } = gisSlice.actions;
 export const gisReducer = gisSlice.reducer;
 ```
 
-**Örnek: shell store** (`osint-mvp/osint-mvp-web-shell/src/store/index.ts`)
+**Example: shell store** (`osint-mvp/osint-mvp-web-shell/src/store/index.ts`)
 
 ```ts
 import { configureStore } from '@reduxjs/toolkit';
@@ -218,7 +218,7 @@ export type RootState = ReturnType<typeof store.getState>;
 export type AppDispatch = typeof store.dispatch;
 ```
 
-**Örnek: cross-module okuma** (`osint-gis-modules/osint-gis-web/src/pages/MapPage.tsx`)
+**Example: cross-module read** (`osint-gis-modules/osint-gis-web/src/pages/MapPage.tsx`)
 
 ```tsx
 import { useSelector } from 'react-redux';
@@ -231,77 +231,77 @@ export default function MapPage() {
   const intel  = useSelector((s: RootState) => s.intelligence.dummy);
   const search = useSelector((s: RootState) => s.search.dummy);
 
-  return <h1>Merhaba {shell} + {gis} + {video} + {intel} + {search}</h1>;
+  return <h1>Hello {shell} + {gis} + {video} + {intel} + {search}</h1>;
 }
 ```
 
-> **Not (tip paylaşımı)**: `RootState` tipinin modüllere döngüsel bağımlılık yaratmaması için, tip `osint-web-core` içinde declare edilir; shell reducer şemasıyla bu tipi augment eder. Alternatif: RTK 2.0 `combineSlices` + `injectSlices` ile **lazy slice registration** (modüller runtime'da store'a enjekte edilir, shell başlangıçta hepsini tanımak zorunda kalmaz).
+> **Note (type sharing)**: So `RootState` does not create circular dependencies for modules, the type is declared in `osint-web-core`; the shell augments it to match the reducer schema. Alternative: RTK 2.0 `combineSlices` + `injectSlices` for **lazy slice registration** (modules inject into the store at runtime; the shell does not need to know them all up front).
 
 ---
 
 ## 5) TanStack Server State
 
-**Amaç**: Intelligence entity'sinin server-state'ini TanStack Query ile yönetmek; cache'i **tüm modüller** (GIS, Video, Intelligence, Search) arasında paylaşmak.
+**Goal**: Manage the Intelligence entity’s server state with TanStack Query; share the cache across **all modules** (GIS, Video, Intelligence, Search).
 
 **Entity** (`osint-intelligence-modules/osint-intelligence-web/src/domain/intelligence.ts`)
 
-- Alanlar: `id`, `header`, `description`, `templateId`, `createdAt`, `tags[]`, ...
+- Fields: `id`, `header`, `description`, `templateId`, `createdAt`, `tags[]`, ...
 
 **API** (`osint-intelligence-modules/osint-intelligence-web/src/api/intelligenceApi.ts`)
 
-- Base URL modül `config.ts` içinden okunur (ör. Solr endpoint'i).
-- Fonksiyonlar:
+- Base URL is read from the module `config.ts` (e.g. Solr endpoint).
+- Functions:
   - `getById(id)`
   - `executeQuery(q)` — Solr query DSL
   - `deleteById(id)`
   - `create(dto)`
   - `update(dto)`
 
-**Cache stratejisi (TanStack Query)**
+**Cache strategy (TanStack Query)**
 
-- **Tek `QueryClient`** shell'de kurulur; `QueryClientProvider` ile tüm uygulamayı sarar → cache paylaşımı otomatik olur.
-- QueryKey şeması (tutarlı olsun diye merkezi factory):
+- A single **`QueryClient`** is set up in the shell; `QueryClientProvider` wraps the whole app → cache sharing is automatic.
+- QueryKey schema (central factory for consistency):
   - `['intelligence', 'byId', id]`
   - `['intelligence', 'query', queryHash]`
-- `staleTime`, `gcTime` değerleri modül `config.ts`'den okunur (env'e göre ayarlanabilir).
-- Mutations (`create`, `update`, `deleteById`) sonrası ilgili query key'ler `queryClient.invalidateQueries(...)` ile tazelenir.
+- `staleTime`, `gcTime` values are read from the module `config.ts` (can be tuned per env).
+- After mutations (`create`, `update`, `deleteById`), related query keys are refreshed with `queryClient.invalidateQueries(...)`.
 
-**Cross-module erişim**
+**Cross-module access**
 
-- `osint-intelligence-web`, tüketilebilir **paylaşılan hook'lar** export eder:
+- `osint-intelligence-web` exports consumable **shared hooks**:
   - `useIntelligenceById(id)`
   - `useIntelligenceQuery(q)`
   - `useDeleteIntelligence()`
-- GIS, Video ve Search modülleri bu hook'ları import edip kullanır; API'yi doğrudan çağırmaz.
-- Aynı `QueryClient` paylaşıldığı için dört modül de aynı cache'i tüketir (bir modülün `getById(42)` sorgusu, diğer modülde anında cache hit olur).
+- GIS, Video, and Search modules import and use these hooks; they do not call the API directly.
+- Because the same `QueryClient` is shared, all four modules consume the same cache (a `getById(42)` query in one module is an instant cache hit in another).
 
-**Olabildiğince TanStack yeteneklerini kullan**
+**Use TanStack capabilities as much as practical**
 
-- `useQuery`, `useMutation`, `useInfiniteQuery` (sayfalama), `useSuspenseQuery` (isteğe bağlı).
-- `queryClient.prefetchQuery` — modül geçişlerinde önceden veri yükleme.
-- `select` fonksiyonu — component'e özel veri türetme (gereksiz re-render'ı önler).
-- DevTools: `@tanstack/react-query-devtools` shell'de tek kez mount edilir.
+- `useQuery`, `useMutation`, `useInfiniteQuery` (pagination), `useSuspenseQuery` (optional).
+- `queryClient.prefetchQuery` — preload data on module transitions.
+- `select` — derive view-specific data in the component (avoids unnecessary re-renders).
+- DevTools: `@tanstack/react-query-devtools` mounted once in the shell.
 
 ---
 
-## 6) Multi-Repo Topolojisi ve Tooling
+## 6) Multi-Repo Topology and Tooling
 
-**Paketleme modeli**: Sekiz bağımsız git reposu, aynı `<workspace-root>/` altında **siblings** olarak checkout edilir. Tek bir `pnpm-workspace.yaml` ya da Turborepo yoktur; modüller arası bağımlılıklar pnpm `file:` protokolüyle dosya sistemi seviyesinde sembolik bağlanır.
+**Packaging model**: Eight independent git repos are checked out as **siblings** under the same `<workspace-root>/`. There is no single `pnpm-workspace.yaml` or Turborepo; inter-module dependencies are linked at filesystem level via pnpm `file:` protocol.
 
 ```
-<workspace-root>/                 (örn. D:\IsrMvp\)
-├─ osint-tools/                     # ortak toolchain repo (bootstrap.ps1 + env.ps1 + .tools/)
-├─ osint-mvp/                       # frontend shell + ince Maven aggregator (pom.xml)
-│  └─ osint-mvp-web-shell/          # Vite uygulaması
-├─ osint-core-modules/              # osint-web-core (en alt taban)
-├─ osint-intelligence-modules/      # osint-intelligence-web (paylaşılan veri domain'i)
+<workspace-root>/                 (e.g. D:\IsrMvp\)
+├─ osint-tools/                     # shared toolchain repo (bootstrap.ps1 + env.ps1 + .tools/)
+├─ osint-mvp/                       # frontend shell + thin Maven aggregator (pom.xml)
+│  └─ osint-mvp-web-shell/          # Vite app
+├─ osint-core-modules/              # osint-web-core (bottom-most base)
+├─ osint-intelligence-modules/      # osint-intelligence-web (shared data domain)
 ├─ osint-gis-modules/               # osint-gis-web (CesiumJS)
 ├─ osint-video-modules/             # osint-video-web
 ├─ osint-search-modules/            # osint-search-web
 └─ osint-auth-modules/              # osint-auth-backend (Spring Boot, self-contained POM)
 ```
 
-**Frontend bağımlılık bildirimi**: her tüketici, sibling'leri `file:` yoluyla referans eder. Örnek (`osint-mvp/osint-mvp-web-shell/package.json`):
+**Frontend dependency declaration**: each consumer references siblings via `file:` paths. Example (`osint-mvp/osint-mvp-web-shell/package.json`):
 
 ```json
 {
@@ -315,61 +315,61 @@ export default function MapPage() {
 }
 ```
 
-pnpm `file:` deps'i `node_modules/<pkg>` altında hedef klasöre symlink olarak bağlar; dolayısıyla **modüller hâlâ source'tan tüketilir** (build yok). Vite, symlink üzerinden TypeScript kaynağını doğrudan transform eder.
+pnpm `file:` deps link `node_modules/<pkg>` to the target folder as a symlink; therefore **modules are still consumed from source** (no build). Vite transforms TypeScript source directly through the symlink.
 
-`**bootstrap:siblings` yardımcısı** (`osint-mvp-web-shell/scripts/install-siblings.mjs`): pnpm `file:` deps yalnız sibling **klasörünü** bağlar — sibling'in kendi `node_modules/` içeriği otomatik dolmaz. Bu script, bağımlılık grafini (`core` → `intelligence` → `gis/video/search`) sırasında her bir sibling repo'da `pnpm install --prefer-offline` çalıştırarak grafı tek komutla hazırlar:
+`**bootstrap:siblings` helper** (`osint-mvp-web-shell/scripts/install-siblings.mjs`): pnpm `file:` deps only link the sibling **folder** — the sibling’s own `node_modules/` is not populated automatically. This script runs `pnpm install --prefer-offline` in each sibling repo in dependency order (`core` → `intelligence` → `gis/video/search`) to prepare the graph with one command:
 
 ```powershell
 cd osint-mvp\osint-mvp-web-shell
-pnpm bootstrap:siblings   # her sibling için pnpm install
-pnpm install              # shell deps + symlink siblings
+pnpm bootstrap:siblings   # pnpm install for each sibling
+pnpm install              # shell deps + relative symlink siblings
 ```
 
-**Toolchain repo'su `osint-tools`**: tüm repolar `<workspace-root>/osint-tools/env.ps1`'i dot-source ederek izole JDK 21 / Maven 3.9.15 / Node LTS / pnpm 10 takımına bağlanır. `.tools/` içeriği (~250 MB) `osint-tools/.gitignore` tarafından dışarıda bırakılır; bootstrap script'i `$PSScriptRoot` tabanlı olduğu için hangi sibling repo'dan dot-source edildiği önemli değil.
+**Toolchain repo `osint-tools`**: all repos dot-source `<workspace-root>/osint-tools/env.ps1` to attach to an isolated JDK 21 / Maven 3.9.15 / Node LTS / pnpm 10 toolchain. `.tools/` content (~250 MB) is excluded via `osint-tools/.gitignore`; because the bootstrap script is `$PSScriptRoot`-based, it does not matter which sibling repo you dot-source from.
 
-**Per-repo konfigürasyon dosyaları** (her frontend repo'sunda):
+**Per-repo configuration files** (in each frontend repo):
 
-- `tsconfig.json` — self-contained (paylaşılan parent yok). Shell'de ek olarak `tsconfig.base.json` bulunur ama yalnızca shell `extends`'iyle tüketilir.
-- `.eslintrc.cjs` — `no-restricted-imports` ile **per-repo sınır koruyucusu** (Section 7'ye bakınız).
-- `.npmrc` — `registry=https://registry.npmjs.org/` (kurumsal proxy override), `node-linker=isolated`, `link-workspace-packages=false`, `store-dir=../../osint-tools/.tools/pnpm-store` (paylaşılan content-addressable store).
-- `.prettierrc` — yalnız shell'de; modüller shell'in formatlama kurallarını takip eder.
-- `.gitignore` — repo kökünde; `node_modules/`, `dist/`, `target/`, IDE state.
+- `tsconfig.json` — self-contained (no shared parent). The shell additionally has `tsconfig.base.json` but it is only consumed via shell `extends`.
+- `.eslintrc.cjs` — **per-repo boundary guard** with `no-restricted-imports` (see Section 7).
+- `.npmrc` — `registry=https://registry.npmjs.org/` (enterprise proxy override), `node-linker=isolated`, `link-workspace-packages=false`, `store-dir=../../osint-tools/.tools/pnpm-store` (shared content-addressable store).
+- `.prettierrc` — shell only; modules follow the shell formatting rules.
+- `.gitignore` — at repo root; `node_modules/`, `dist/`, `target/`, IDE state.
 
-**Backend tarafı**: `osint-auth-modules/osint-auth-backend/pom.xml` **self-contained** — `<parent>` yoktur, `spring-boot-dependencies` BOM doğrudan `<dependencyManagement>`'da import edilir. `osint-mvp/pom.xml` ise yalnız `<modules><module>../osint-auth-modules/osint-auth-backend</module></modules>` içeren **ince bir aggregator**'dur; sibling repo checkout'u olduğu sürece `mvn` komutu workspace bazında çalışır, olmadığında backend modülü kendi POM'uyla bağımsız olarak build edilebilir.
+**Backend**: `osint-auth-modules/osint-auth-backend/pom.xml` is **self-contained** — no `<parent>`; `spring-boot-dependencies` BOM is imported directly in `<dependencyManagement>`. `osint-mvp/pom.xml` is only a **thin aggregator** with `<modules><module>../osint-auth-modules/osint-auth-backend</module></modules>`; as long as the sibling repo is checked out, `mvn` runs workspace-wide; if not, the backend module can still be built standalone with its own POM.
 
-**Production bundle**: tek tek modüllerin build'i yoktur. `pnpm build` shell repo'sunda çalıştırılır; Vite tüm sibling modüllerini tree-shake ederek `osint-mvp-web-shell/dist/` altında tek bir bundle üretir.
+**Production bundle**: individual module builds do not exist. `pnpm build` runs in the shell repo; Vite tree-shakes all sibling modules and produces a single bundle under `osint-mvp-web-shell/dist/`.
 
-**Trade-off ve kasten yapılan seçimler**:
+**Trade-offs and deliberate choices**:
 
-- Avantaj: her repo bağımsız versiyonlanır / release'lenir; CI tek-paket bazlı kalır; Turborepo gibi monorepo orkestratörü sorumluluğu kalkar.
-- Maliyet: bağımlılık değişikliğinde tüketiciler `pnpm bootstrap:siblings` sonra `pnpm install` çalıştırır. Paylaşılan store sayesinde ağ trafiği olmaz.
+- Advantage: each repo versions/releases independently; CI stays single-package based; no Turborepo-style monorepo orchestrator responsibility.
+- Cost: on dependency changes consumers run `pnpm bootstrap:siblings` then `pnpm install`. The shared store avoids network traffic.
 
 ---
 
-## 7) Bağımlılık Grafı ve Geliştirme Deneyimi
+## 7) Dependency Graph and Developer Experience
 
-**Bağımlılık kuralı (multi-tier)**
+**Dependency rule (multi-tier)**
 
 ```
-osint-mvp-web-shell                                 ← her şeyi import edebilir
+osint-mvp-web-shell                                 ← may import everything
         │
         ▼
 osint-gis-web   osint-video-web   osint-search-web      ← visualization siblings
-        │           │               │                (yatay siblings yasak)
+        │           │               │                (horizontal siblings forbidden)
         └────┐      │      ┌────────┘
              ▼      ▼      ▼
-            osint-intelligence-web                   ← paylaşılan veri domain'i
+            osint-intelligence-web                   ← shared data domain
                        │
                        ▼
-                  osint-web-core                     ← en alt taban
+                  osint-web-core                     ← bottom-most base
 ```
 
-- `**osint-web-core**` hiçbir `osint-*-web` modülünü import etmez; framework-agnostic tipler, hook'lar (`useCurrentUser`), zod şemaları için paylaşılan taban.
-- `**osint-intelligence-web**` bir paylaşılan veri domain'idir: `osint-web-core`'a bağımlı olabilir, ama görsel siblings'i (gis/video/search) import edemez. `useIntelligenceById`, `useIntelligenceQuery`, `useDeleteIntelligence` hook'larını export eder.
-- **Visualization siblings** (`osint-gis-web`, `osint-video-web`, `osint-search-web`) `osint-web-core` ve `osint-intelligence-web`'i import edebilir, ama birbirini import edemez.
-- **Shell** her şeyi import edebilir.
+- `**osint-web-core**` imports no `osint-*-web` module; framework-agnostic types, hooks (`useCurrentUser`), shared base for Zod schemas.
+- `**osint-intelligence-web**` is a shared data domain: it may depend on `osint-web-core` but must not import visualization siblings (gis/video/search). It exports `useIntelligenceById`, `useIntelligenceQuery`, `useDeleteIntelligence`.
+- **Visualization siblings** (`osint-gis-web`, `osint-video-web`, `osint-search-web`) may import `osint-web-core` and `osint-intelligence-web`, but not each other.
+- **Shell** may import everything.
 
-**Multi-repo'da boundary enforcement**: tek bir `eslint-plugin-boundaries` konfigürasyonu yok — her repo kendi `.eslintrc.cjs`'sinde `no-restricted-imports` ile sınır koruyucusunu ilan eder. Örnek (`osint-gis-modules/osint-gis-web/.eslintrc.cjs`):
+**Multi-repo boundary enforcement**: there is no single `eslint-plugin-boundaries` config — each repo declares its boundary guard in its own `.eslintrc.cjs` with `no-restricted-imports`. Example (`osint-gis-modules/osint-gis-web/.eslintrc.cjs`):
 
 ```js
 'no-restricted-imports': ['error', { patterns: [{
@@ -378,26 +378,26 @@ osint-gis-web   osint-video-web   osint-search-web      ← visualization siblin
 }]}]
 ```
 
-`osint-intelligence-web`'in eslint'i yalnız `gis/video/search`'ü yasaklar; `osint-web-core`'un eslint'i tüm `osint-*-web` paketlerini yasaklar. Böylelikle merkezi bir boundaries plugin'i gerekmez ve her repo bağımsız lint edilebilir.
+`osint-intelligence-web`’s ESLint only forbids `gis/video/search`; `osint-web-core`’s ESLint forbids all `osint-*-web` packages. Thus no central boundaries plugin is required and each repo can be linted independently.
 
-`**RootState` tip paylaşımı (cross-repo, circular dep'siz)**
+`**RootState` type sharing (cross-repo, no circular deps)**
 
 `osint-core-modules/osint-web-core/src/store.ts`:
 
 ```ts
-export interface AppRootStateSchema {} // başlangıçta boş — shell augment eder
+export interface AppRootStateSchema {} // initially empty — shell augments
 
 export type RootState = AppRootStateSchema;
 ```
 
-Her modül kendi state tipini export eder:
+Each module exports its own state type:
 
 ```ts
 // osint-gis-modules/osint-gis-web/src/store/gisSlice.ts
 export type GisState = { dummy: string /* ... */ };
 ```
 
-Shell tek merkezden tüm tipleri augment eder:
+The shell augments all types from one place:
 
 ```ts
 // osint-mvp/osint-mvp-web-shell/src/store/augmentations.ts
@@ -419,11 +419,11 @@ declare module 'osint-web-core' {
 }
 ```
 
-Sonuç: `RootState`, tüm repolar arasında **tam tip-güvenli** (autocomplete, refactor-safe) şekilde çalışır.
+Result: `RootState` works **fully type-safe** (autocomplete, refactor-safe) across all repos.
 
-`**osint-web-core` paket bağımlılıkları**
+`**osint-web-core` package dependencies**
 
-`useCurrentUser` içinde `useSelector` kullanıldığı için `osint-web-core`, aşağıdakileri `**peerDependencies`** olarak ilan eder (kendi `dependencies` listesine eklemez — duplicate React / Redux instance riskini ortadan kaldırır):
+Because `useCurrentUser` uses `useSelector`, `osint-web-core` declares the following as `**peerDependencies**` (it does not add them to its own `dependencies` — avoids duplicate React / Redux instance risk):
 
 ```json
 {
@@ -435,25 +435,25 @@ Sonuç: `RootState`, tüm repolar arasında **tam tip-güvenli** (autocomplete, 
 }
 ```
 
-- Her tüketici (shell + 4 visualization domain + intelligence) bu paketleri kendi `dependencies` içinde taşır; pnpm shared store sayesinde tek instance çözer.
-- Sürüm aralıkları, shell `package.json` ile aynı major / minor olacak şekilde her sibling repo'da hizalanır.
+- Each consumer (shell + 4 visualization domains + intelligence) carries these packages in its own `dependencies`; pnpm’s shared store resolves to a single instance.
+- Version ranges are aligned across each sibling repo to match the shell `package.json` major/minor.
 
-**Dev server ve Hot Module Replacement (HMR) — multi-repo'da**
+**Dev server and Hot Module Replacement (HMR) — multi-repo**
 
-Geliştirme döngüsü manuel build adımı **içermez**:
+The dev loop **does not** include a manual build step:
 
-1. `pnpm dev` shell repo'sunda (`osint-mvp/osint-mvp-web-shell/`) Vite dev server'ı başlatır.
-2. Shell, `import { gisModule } from 'osint-gis-web'` gibi paket adlarıyla ifade eder.
-3. pnpm, `node_modules/osint-gis-web`'i `../../osint-gis-modules/osint-gis-web/`'e symlink olarak bağlamıştır; gerçek kaynak dosyalar farklı bir repo'da yaşar.
-4. Vite, modülün `package.json`'undaki `"main": "./src/index.tsx"` alanını izleyerek TypeScript kaynağını doğrudan okur.
-5. Geliştirici `osint-gis-modules/osint-gis-web/src/pages/MapPage.tsx`'i kaydettiğinde:
-  - Vite file watcher değişikliği symlink üzerinden yakalar.
-  - Vite log'una `[vite] (client) hmr update /@fs/<workspace>/osint-gis-modules/osint-gis-web/src/pages/MapPage.tsx` düşürür.
-  - **Tarayıcı ~100-300 ms içinde state'ini koruyarak yenilenir.**
+1. `pnpm dev` in the shell repo (`osint-mvp/osint-mvp-web-shell/`) starts the Vite dev server.
+2. The shell uses package names like `import { gisModule } from 'osint-gis-web'`.
+3. pnpm linked `node_modules/osint-gis-web` as a symlink to `../../osint-gis-modules/osint-gis-web/`; the real source files live in another repo.
+4. Vite follows `"main": "./src/index.tsx"` in the module’s `package.json` and reads TypeScript source directly.
+5. When a developer saves `osint-gis-modules/osint-gis-web/src/pages/MapPage.tsx`:
+  - Vite’s file watcher picks up the change through the symlink.
+  - Vite logs `[vite] (client) hmr update /@fs/<workspace>/osint-gis-modules/osint-gis-web/src/pages/MapPage.tsx`.
+  - **The browser refreshes in ~100–300 ms while keeping state.**
 
-Bu davranış uçtan uca doğrulandı: bir `osint-gis-web` dosya değişikliği shell'in HMR'ına sorunsuz düştü (Vite 7.3.2, `vite.log` çıktısı). Yani: cross-repo source consumption + HMR, multi-repo geçişten sonra da çalışıyor.
+This behavior was validated end to end: a change in `osint-gis-web` flowed into the shell’s HMR cleanly (Vite 7.3.2, `vite.log` output). Cross-repo source consumption + HMR works after moving to multi-repo.
 
-**Vite config gereksinimleri** (`osint-mvp/osint-mvp-web-shell/vite.config.ts`):
+**Vite config requirements** (`osint-mvp/osint-mvp-web-shell/vite.config.ts`):
 
 ```ts
 import { defineConfig } from 'vite';
@@ -462,7 +462,7 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   server: {
-    fs: { allow: ['..', '../..'] }, // workspace root'a kadar erişim (cross-repo source serve)
+    fs: { allow: ['..', '../..'] }, // allow up to workspace root (cross-repo source serve)
   },
   test: {
     environment: 'jsdom',
@@ -472,28 +472,28 @@ export default defineConfig({
 });
 ```
 
-Notlar:
+Notes:
 
-- `server.fs.allow: ['..', '../..']` shell `osint-mvp/osint-mvp-web-shell/`'tan iki seviye yukarı, yani workspace root'a kadar erişim verir; sibling repo'lardan source serve etmek için şart.
-- Vite 7'de `optimizeDeps.include` ile sibling paketleri listelemek **gereksiz**: pnpm symlink'i ve `"main": "./src/index.tsx"` zaten Vite'in modül grafına kaynağı sokuyor; eklenirse `Cannot optimize dependency` uyarısı oluşuyor.
+- `server.fs.allow: ['..', '../..']` from shell `osint-mvp/osint-mvp-web-shell/` goes two levels up to the workspace root; required to serve source from sibling repos.
+- In Vite 7, listing sibling packages in `optimizeDeps.include` is **unnecessary**: pnpm symlinks and `"main": "./src/index.tsx"` already pull source into Vite’s module graph; adding them triggers `Cannot optimize dependency` warnings.
 
-**Production build**: `pnpm build` shell repo'sunda. Vite, sibling modülleri tree-shake ederek tek bundle'a derler. Sibling modüllerin ayrı build'i **yok**.
+**Production build**: `pnpm build` in the shell repo. Vite tree-shakes sibling modules into one bundle. Sibling modules have **no** separate build.
 
 ---
 
-## 8) Auth ve Permissions (MVP: basit backend + dummy kullanıcılar)
+## 8) Auth and Permissions (MVP: simple backend + dummy users)
 
-**MVP Yaklaşımı**
+**MVP approach**
 
-MVP'de **Keycloak/OIDC kurulmuyor**. Bunun yerine **basit bir Spring Boot servisi** (`osint-auth-backend`) ayağa kalkar; kullanıcılar ve permission'ları `application.yml`'de **hardcoded dummy** olarak tutulur. Shell bu servise login olup JWT alır. Keycloak/Azure AD entegrasyonu **Bölüm 12 Roadmap**'te planlanmıştır — MVP'nin `ProtectedRoute` + `useCurrentUser()` soyutlamaları sayesinde o geçiş kırılma yaratmaz (sadece auth kaynağı değişir).
+The MVP does **not** set up Keycloak/OIDC. Instead a **simple Spring Boot service** (`osint-auth-backend`) runs; users and permissions are **hardcoded dummy** data in `application.yml`. The shell logs in to this service and receives JWT. Keycloak/Azure AD integration is planned in **Section 12 Roadmap** — MVP’s `ProtectedRoute` + `useCurrentUser()` abstractions mean that switch does not break modules (only the auth source changes).
 
 ### 8.1. Backend: `osint-auth-backend`
 
-- **Konum**: `osint-auth-modules/osint-auth-backend/`
+- **Location**: `osint-auth-modules/osint-auth-backend/`
 - **Stack**: Java 21, Spring Boot 3, Spring Security (JWT), Spring Web.
-- **Kalıcılık yok (MVP)**: kullanıcı listesi `application.yml`'den okunur; DB ileride eklenir.
+- **No persistence (MVP)**: user list is read from `application.yml`; DB comes later.
 
-`**application.yml` (örnek)**
+`**application.yml` (example)**
 
 ```yaml
 server:
@@ -520,7 +520,7 @@ osint:
           - search.panel.view
 ```
 
-**Endpoint'ler**
+**Endpoints**
 
 - `POST /auth/login`
   - Request: `{ "username": "admin", "password": "admin123" }`
@@ -530,7 +530,7 @@ osint:
   - Response: `{ "userId": "u-1", "username": "admin", "permissions": ["gis.map.view", ...] }`
 - `POST /auth/logout`
   - Header: `Authorization: Bearer <JWT>`
-  - Response: `204` (MVP'de client-side discard yeterli; blacklist ileride)
+  - Response: `204` (MVP: client-side discard is enough; blacklist later)
 
 **JWT payload**
 
@@ -543,20 +543,20 @@ osint:
 }
 ```
 
-> `permissions`'ı JWT içine gömmek MVP için pragmatik. Permission sayısı büyürse (50+) JWT'yi minimal tutup `/me` üzerinden çekmek daha iyi.
+> Embedding `permissions` in the JWT is pragmatic for MVP. If permission count grows large (50+), keep the JWT minimal and fetch via `/me`.
 
-### 8.2. Shell entegrasyonu
+### 8.2. Shell integration
 
-**Klasör**: `osint-mvp/osint-mvp-web-shell/src/auth/`
+**Folder**: `osint-mvp/osint-mvp-web-shell/src/auth/`
 
-- `LoginPage.tsx` — MUI ile basit form (username + password + submit).
-- `authApi.ts` — `login(username, password)`, `fetchMe()`, `logout()` fonksiyonları; base URL shell `config.ts`'den okunur.
+- `LoginPage.tsx` — simple MUI form (username + password + submit).
+- `authApi.ts` — `login(username, password)`, `fetchMe()`, `logout()`; base URL from shell `config.ts`.
 - `authInterceptor.ts` — fetch/axios interceptor:
-  - Her isteğe `Authorization: Bearer <JWT>` ekler.
-  - `401` dönerse JWT'yi temizler ve `/login`'e yönlendirir.
-- `ProtectedRoute.tsx` — route guard component'i (aşağıda).
+  - Adds `Authorization: Bearer <JWT>` to every request.
+  - On `401`, clears JWT and redirects to `/login`.
+- `ProtectedRoute.tsx` — route guard component (below).
 
-`**useCurrentUser()` hook'u** (`osint-web-core`'dan export)
+`**useCurrentUser()` hook** (exported from `osint-web-core`)
 
 ```ts
 // osint-core-modules/osint-web-core/src/auth/useCurrentUser.ts
@@ -579,7 +579,7 @@ export function useCurrentUser() {
 }
 ```
 
-### 8.3. `shellSlice` yapısı
+### 8.3. `shellSlice` structure
 
 ```ts
 // osint-mvp/osint-mvp-web-shell/src/store/shellSlice.ts
@@ -626,15 +626,15 @@ export const shellActions = shellSlice.actions;
 export const shellReducer = shellSlice.reducer;
 ```
 
-### 8.4. `ProtectedRoute` component'i
+### 8.4. `ProtectedRoute` component
 
-**Önemli**: Aşağıdaki `Navigate`, `**@tanstack/react-router`** paketinden gelir — `react-router-dom` ile karıştırılmamalıdır. TanStack Router, mount anında yönlendirme için bu bileşeni önerir (`useEffect` + `useNavigate` yerine).
+**Important**: The `Navigate` below comes from **`@tanstack/react-router`** — do not confuse with `react-router-dom`. TanStack Router recommends this component for redirect-on-mount (`useEffect` + `useNavigate` instead).
 
 ```tsx
 // osint-mvp/osint-mvp-web-shell/src/auth/ProtectedRoute.tsx
 import { Navigate } from '@tanstack/react-router';
 import { useCurrentUser } from 'osint-web-core';
-import { ForbiddenPage } from './ForbiddenPage'; // shell içi stub / gerçek 403 sayfası
+import { ForbiddenPage } from './ForbiddenPage'; // in-shell stub / real 403 page
 
 interface Props {
   permissions: string[];
@@ -644,7 +644,7 @@ interface Props {
 export function ProtectedRoute({ permissions, children }: Props) {
   const { isAuthenticated, hasPermission } = useCurrentUser();
 
-  // replace: true → login redirect history'yi şişirmez (geri tuşu döngüsü olmaz)
+  // replace: true → login redirect does not bloat history (no back-button loop)
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
   const missing = permissions.filter((p) => !hasPermission(p));
@@ -654,74 +654,74 @@ export function ProtectedRoute({ permissions, children }: Props) {
 }
 ```
 
-> İleride route bazlı `beforeLoad` içinde `throw redirect({ to: '/login' })` kullanmak da mümkün; MVP'de bu wrapper yeterli ve tüm manifest route'larına tek pattern ile uygulanır.
+> Later you can use `throw redirect({ to: '/login' })` in route `beforeLoad`; for MVP this wrapper is enough and applies one pattern to all manifest routes.
 
-Menü layout'u da (`RootLayout`) `hasPermission` üzerinden filtreler — permission'ı olmayan kullanıcı menü item'ını **görmez**.
+The menu layout (`RootLayout`) also filters via `hasPermission` — users without permission **do not see** the menu item.
 
-### 8.5. Login akışı (end-to-end)
+### 8.5. Login flow (end-to-end)
 
 ```
-1. Kullanıcı shell'i ilk açar (JWT yok) → /login'e yönlendirilir.
+1. User opens shell first (no JWT) → redirected to /login.
 2. LoginPage form submit → POST /auth/login (osint-auth-backend).
-3. Backend dummy user'ı doğrular, JWT üretir ve döner.
+3. Backend validates dummy user, issues JWT and returns it.
 4. Shell:
-     - JWT'yi localStorage'a kaydeder.
-     - shellSlice.authSuccess dispatch'ler (token + user + permissions).
-5. Router kullanıcıyı ilk eşleşen manifest route'una yönlendirir.
-6. Her route render'ında <ProtectedRoute permissions=[...]> kontrol eder.
-7. Her API isteğinde authInterceptor JWT ekler.
-8. Sayfa yenilenirse: shell boot'ta localStorage'dan JWT'yi okur → GET /me → shellSlice.authSuccess.
-9. JWT expire olursa (401) → interceptor logout dispatch + /login redirect.
+     - Stores JWT in localStorage.
+     - Dispatches shellSlice.authSuccess (token + user + permissions).
+5. Router sends user to the first matching manifest route.
+6. Each route render runs <ProtectedRoute permissions=[...]> check.
+7. Every API request: authInterceptor adds JWT.
+8. On page refresh: shell boot reads JWT from localStorage → GET /me → shellSlice.authSuccess.
+9. On JWT expiry (401) → interceptor logout dispatch + /login redirect.
 ```
 
 ### 8.6. JWT storage (MVP → Production)
 
-- **MVP**: `localStorage` + Redux memory. Dev pragmatik, XSS'e karşı savunmasız.
-- **Production (Keycloak geçişinde)**: `httpOnly` cookie + refresh token rotation. Backend cookie'yi set eder, frontend JS'ten erişemez.
+- **MVP**: `localStorage` + Redux memory. Pragmatic for dev; vulnerable to XSS.
+- **Production (Keycloak migration)**: `httpOnly` cookie + refresh token rotation. Backend sets the cookie; frontend JS cannot read it.
 
-### 8.7. Kural — modüller
+### 8.7. Rule — modules
 
-- **Hiçbir domain modülü** (`osint-gis-web`, `osint-video-web`, ...) auth bilgisi **tutmaz**.
-- Permission kontrolü için `useCurrentUser().hasPermission(...)` kullanır.
-- Token asla modüle parametre olarak geçilmez — `authInterceptor` tüm API istekleri için otomatik ekler.
+- **No domain module** (`osint-gis-web`, `osint-video-web`, ...) **stores** auth state.
+- Use `useCurrentUser().hasPermission(...)` for permission checks.
+- Never pass the token into modules as a parameter — `authInterceptor` adds it automatically for all API calls.
 
-### 8.8. MVP'de atlanan, ileride eklenecekler
+### 8.8. Skipped in MVP, to add later
 
-- Rate limiting / brute-force koruması (Bucket4j vs.).
-- Password hashing (MVP'de plaintext karşılaştırma, Keycloak geçişinde konu dışı).
-- CSRF koruması (Keycloak + cookie'ye geçişte aktif edilir).
+- Rate limiting / brute-force protection (Bucket4j vs.).
+- Password hashing (MVP uses plaintext comparison; out of scope for Keycloak migration discussion).
+- CSRF protection (enabled when moving to Keycloak + cookies).
 - Multi-tenant / compartment.
 - Permission inheritance / role hierarchy.
 - Audit log.
 
-Bunların tümü **Bölüm 12 Roadmap**'te; MVP'nin `useCurrentUser` + `ProtectedRoute` soyutlamaları bu geçişi non-breaking kılar.
+All of these are in **Section 12 Roadmap**; MVP’s `useCurrentUser` + `ProtectedRoute` abstractions keep that migration non-breaking.
 
 ---
 
-## 9) Cross-module Etkileşim Kuralları
+## 9) Cross-module Interaction Rules
 
-**İzinli**
+**Allowed**
 
-- Başka modülün **state'ini okumak**: `useSelector((s: RootState) => s.gis.selectedLayer)`.
-- Başka modülün **export ettiği hook'u kullanmak**: `useIntelligenceById(id)`.
-- `osint-web-core`'daki ortak tipleri / utility'leri kullanmak.
+- **Read another module’s state**: `useSelector((s: RootState) => s.gis.selectedLayer)`.
+- **Use another module’s exported hook**: `useIntelligenceById(id)`.
+- Use shared types / utilities in `osint-web-core`.
 
-**Yasak**
+**Forbidden**
 
-- Başka modülün slice action'larını dışarıdan `dispatch` etmek (ör. `dispatch(gisActions.setLayer(...))` Video modülünden). Modül, kendi slice'ını yalnızca kendi sınırları içinde mutate eder.
-- Bir modülü başka bir modülün kaynak kodundan import etmek (yatay import). Ortak ihtiyaç → `osint-web-core`.
-- `osint-web-core` dışında paylaşılan mutable singleton.
+- **Dispatch another module’s slice actions from outside** (e.g. `dispatch(gisActions.setLayer(...))` from the Video module). A module mutates its own slice only inside its boundaries.
+- **Import one module from another module’s source** (horizontal import). Shared need → `osint-web-core`.
+- Shared mutable singleton outside `osint-web-core`.
 
-**Yazma ihtiyacı olursa**
+**If a write is needed**
 
-- Modül kendi export'unda bir **action-hook** sunar: `export function useGisActions() { ... }`. Tüketen modül bunu çağırır; iç implementation modülün kontrolündedir (gelecekte slice şeması değişse bile consumer'lar kırılmaz).
-- Tamamen decoupled iletişim için shell'de global bir event bus (`mitt`) kurulabilir. **Varsayılan değil, son çare**.
+- The module exposes an **action hook** in its exports: `export function useGisActions() { ... }`. The consumer calls it; implementation stays under the module’s control (consumers do not break if the slice shape changes).
+- For fully decoupled communication, a global event bus (`mitt`) can live in the shell. **Not default; last resort**.
 
 ---
 
-## 10) Manifest → TanStack Router Köprüsü
+## 10) Manifest → TanStack Router Bridge
 
-Shell, modüllerin manifest'lerini toplar ve TanStack Router'a çevirir:
+The shell collects module manifests and translates them for TanStack Router:
 
 ```ts
 // osint-mvp/osint-mvp-web-shell/src/router/index.ts
@@ -754,72 +754,71 @@ export const router = createRouter({
 });
 ```
 
-Aynı `allModules` dizisi **menü render'ı** için de kullanılır (layout sidebar `m.menu`'leri flatten'leyip permission filter'dan geçirir).
+The same `allModules` array is used for **menu rendering** (layout sidebar flattens `m.menu` and runs permission filter).
 
 ---
 
-## 11) Testing Stratejisi
+## 11) Testing Strategy
 
-**Modül-içi (her pakette `__tests__/` veya `*.test.ts`)**
+**In-module (each package `__tests__/` or `*.test.ts`)**
 
 - **Vitest** + `@testing-library/react`.
-- **Slice testleri**: pure reducer input/output.
-- **Hook testleri**: `renderHook` + mock `QueryClient`.
-- **Component testleri**: gerekli `Provider`'larla (store + queryClient) sarmalanır.
+- **Slice tests**: pure reducer input/output.
+- **Hook tests**: `renderHook` + mock `QueryClient`.
+- **Component tests**: wrap with required `Provider`s (store + queryClient).
 
 **Shell integration test**
 
-- `osint-mvp-web-shell`'de tek bir test, manifest → store → router kurulumunu baştan sona kurar ve:
-  - Tüm modül reducer'ları store'da kayıtlı mı?
-  - Cross-module dummy demo (`Merhaba shell + gis + video + intel + search`) doğru render oluyor mu?
+- One test in `osint-mvp-web-shell` wires manifest → store → router end to end and checks:
+  - Are all module reducers registered in the store?
+  - Does the cross-module dummy demo (`Hello shell + gis + video + intel + search`) render correctly?
 
 **E2E**
 
-- **Playwright**, shell'i dev server üzerinde açar.
-- Smoke test: login → her modülün bir sayfasına navigasyon → console error yok.
+- **Playwright** opens the shell against the dev server.
+- Smoke test: login → navigate to one page per module → no console errors.
 
 **CI**
 
-- Multi-repo'da CI **per-repo** çalışır: her repo kendi `pnpm install`, `pnpm typecheck`, `pnpm test`, `pnpm lint` (ve shell için `pnpm build`) zincirini koşar. Hangi repo'ların etkilendiği, downstream tüketicilerin `package.json`'larındaki `file:` referanslarından çıkartılır (ör. `osint-web-core`'da bir kırılma için 5 tüketici repo'nun pipeline'ı tetiklenir).
+- In multi-repo, CI runs **per repo**: each repo runs its own `pnpm install`, `pnpm typecheck`, `pnpm test`, `pnpm lint` (and for the shell `pnpm build`). Which repos are affected is derived from downstream `file:` references in `package.json` (e.g. a break in `osint-web-core` triggers pipelines for five consumer repos).
 
 ---
 
-## 12) İleride (Roadmap — MVP kapsamı dışı)
+## 12) Later (Roadmap — outside MVP scope)
 
-Bu notlar mimarinin **büyüme yönünü** işaretler, MVP'de implement edilmez:
+These notes point to **growth directions** for the architecture; they are not implemented in MVP:
 
-- **Keycloak / OIDC entegrasyonu**: `osint-auth-backend` Keycloak'a delege edilir (authorize → token exchange → `/me` mapping). Shell `oidc-client-ts` ile Authorization Code + PKCE akışına geçer. JWT storage `httpOnly` cookie + refresh token rotation'a döner. `useCurrentUser` ve `ProtectedRoute` soyutlamaları aynen kalır → modül kodu **değişmez**. Bu geçiş, user persistence (DB), password hashing, MFA, audit log, rate limiting gibi production gereksinimleri ile birlikte ele alınır.
-- **Shared UI kit**: `osint-core-modules/osint-web-ui/` olarak tema + base component'ler (Button, DataTable, FormField, DialogShell...) tek pakette. Tüm modüller MUI'yi bu paket üzerinden tüketir. Visual/UX tutarlılığı için 3-6. aylarda eklenmesi önerilir.
-- **Search infrastructure ayrımı**: İkinci aranabilir entity eklendiğinde `osint-search-web` generic bir `useSearch(index, query)` hook'u export edecek; Intelligence dahil tüm entity modülleri kendi API'lerinde bunu kullanacak (şu an `executeQuery` Intelligence API'de).
-- **Lazy slice registration**: Modül sayısı 10+'a çıkarsa RTK 2.0 `combineSlices` + `injectSlices`'a geçiş. Shell başlangıçta sadece `shellSlice`'ı bilir; modül yüklendiğinde kendi slice'ını store'a inject eder.
-- **Module Federation**: Modüllerin ayrı deploy cycle'ı gerekirse (bağımsız release) Vite Module Federation düşünülebilir. MVP'de ihtiyaç yok.
+- **Keycloak / OIDC integration**: `osint-auth-backend` delegates to Keycloak (authorize → token exchange → `/me` mapping). Shell moves to Authorization Code + PKCE with `oidc-client-ts`. JWT storage becomes `httpOnly` cookie + refresh token rotation. `useCurrentUser` and `ProtectedRoute` abstractions stay the same → **module code does not change**. This migration is handled together with user persistence (DB), password hashing, MFA, audit log, rate limiting, and other production requirements.
+- **Shared UI kit**: `osint-core-modules/osint-web-ui/` for theme + base components (Button, DataTable, FormField, DialogShell...) in one package. All modules consume MUI through this kit. Recommended for visual/UX consistency in 3–6 months.
+- **Search infrastructure split**: When a second searchable entity is added, `osint-search-web` will export a generic `useSearch(index, query)` hook; all entity modules including Intelligence will use it in their APIs (today `executeQuery` lives on the Intelligence API).
+- **Lazy slice registration**: If module count goes past 10+, migrate to RTK 2.0 `combineSlices` + `injectSlices`. The shell only knows `shellSlice` at startup; each module injects its slice when loaded.
+- **Module Federation**: If modules need separate deploy cycles (independent release), consider Vite Module Federation. Not needed for MVP.
 
 ---
 
-## 13) Implementation Checklist (iskeletin eksiksiz kurulduğunu doğrular)
+## 13) Implementation Checklist (verifies the skeleton is fully set up)
 
-Aşağıdaki maddelerin **tamamı** yeşil olduğunda MVP iskeleti tamamlanmıştır:
+When **all** items below are green, the MVP skeleton is complete:
 
-- 8 git reposu workspace kökünde sibling olarak duruyor: `osint-tools/`, `osint-mvp/`, `osint-core-modules/`, `osint-intelligence-modules/`, `osint-gis-modules/`, `osint-video-modules/`, `osint-search-modules/`, `osint-auth-modules/`. `osint-tools/` izole toolchain (JDK 21 + Maven 3.9.15 + Node LTS + pnpm) sahibidir; her sibling `..\osint-tools\env.ps1`'i dot-source eder.
-- Shell repo'sunda (`osint-mvp/osint-mvp-web-shell/`) `package.json`, `tsconfig.json` (+ `tsconfig.base.json`), `vite.config.ts`, `.eslintrc.cjs`, `.prettierrc`, `.npmrc` ve `scripts/install-siblings.mjs` (`pnpm bootstrap:siblings` komutu) hazır.
-- Her frontend repo'sunda (5 modül + shell) **per-repo** `.eslintrc.cjs` (`no-restricted-imports`), `.npmrc` (registry pin + `node-linker=isolated` + paylaşılan `store-dir=../../osint-tools/.tools/pnpm-store`), `.gitignore` ve self-contained `tsconfig.json` mevcut.
-- Modüller arası bağımlılıklar `package.json` içinde `file:../../osint-*-modules/...` (veya `file:../../osint-core-modules/...`) yoluyla bildirilir; her tüketici, sibling repo'lar checkout edildikten sonra `pnpm bootstrap:siblings` + `pnpm install` ile kurulur.
-- `osint-web-core/package.json`: `peerDependencies` içinde `react`, `react-dom`, `react-redux` tanımlı (sürüm aralıkları shell ile uyumlu); core bunları kendi `dependencies`'ine eklemez.
-- 6 frontend paketi mevcut: `osint-mvp-web-shell`, `osint-gis-web`, `osint-video-web`, `osint-intelligence-web`, `osint-search-web`, `osint-web-core`.
-- 1 backend servisi mevcut: `osint-auth-backend` (Spring Boot, dummy users).
-- Her paketin `package.json`, `tsconfig.json`, `src/index.ts` dosyası var (frontend); auth-backend için `pom.xml` / `build.gradle` + `application.yml`.
-- Her domain modülü `AppModule` manifest'ini export ediyor.
-- Her domain modülünün `config.ts` dosyası ve ilgili kütüphaneleri (GIS için **CesiumJS**) `package.json`'a yazılı.
-- Her modülde `dummy` alanlı slice var; `osint-web-core` `RootState`'i shell'de augment edilmiş.
-- Shell `configureStore` tüm modül reducer'larını birleştiriyor; `<Provider>` ile uygulama sarılı.
-- Shell `QueryClient` + `QueryClientProvider` mount ediyor; DevTools dev modunda görünür.
-- Shell TanStack Router'ı manifest'lerden dinamik kuruyor; `<ProtectedRoute>` her route'u sarıyor.
-- `osint-auth-backend` ayakta (`:8081`); `POST /auth/login`, `GET /me`, `POST /auth/logout` çalışıyor.
-- Shell `LoginPage` + `authApi` + `authInterceptor` + `useCurrentUser` kurulu; localStorage'dan JWT resume çalışıyor.
-- `admin/admin123` ile login → tüm modüllere erişim; `viewer/viewer123` ile login → yalnızca izinli modüller menüde görünür, diğerleri `ForbiddenPage`.
-- Her modülün bir sayfası, **beş dummy'yi** concat ederek `Merhaba {shell} + {gis} + {video} + {intel} + {search}` render ediyor.
-- Intelligence entity + API + 3 TanStack hook (`useIntelligenceById`, `useIntelligenceQuery`, `useDeleteIntelligence`) `osint-intelligence-web`'den export ediliyor; GIS/Video/Search bir sayfada bu hook'u kullanıyor.
-- Vitest "manifest integration test" yeşil.
-- `pnpm dev` çalıştırınca shell açılıyor, login → 4 modülün 1'er sayfasına navigasyon sorunsuz.
-- HMR kanıtı: `osint-gis-web/src/pages/MapPage.tsx` dosyasında bir değişiklik → manuel build olmadan, shell tarayıcıda state'i koruyarak yenileniyor.
-
+- 8 git repos sit as siblings at workspace root: `osint-tools/`, `osint-mvp/`, `osint-core-modules/`, `osint-intelligence-modules/`, `osint-gis-modules/`, `osint-video-modules/`, `osint-search-modules/`, `osint-auth-modules/`. `osint-tools/` owns the isolated toolchain (JDK 21 + Maven 3.9.15 + Node LTS + pnpm); each sibling dot-sources `..\osint-tools\env.ps1`.
+- In the shell repo (`osint-mvp/osint-mvp-web-shell/`) you have `package.json`, `tsconfig.json` (+ `tsconfig.base.json`), `vite.config.ts`, `.eslintrc.cjs`, `.prettierrc`, `.npmrc`, and `scripts/install-siblings.mjs` (`pnpm bootstrap:siblings` command).
+- In every frontend repo (5 modules + shell): **per-repo** `.eslintrc.cjs` (`no-restricted-imports`), `.npmrc` (registry pin + `node-linker=isolated` + shared `store-dir=../../osint-tools/.tools/pnpm-store`), `.gitignore`, and self-contained `tsconfig.json`.
+- Inter-module dependencies are declared in `package.json` as `file:../../osint-*-modules/...` (or `file:../../osint-core-modules/...`); after sibling repos are checked out each consumer is set up with `pnpm bootstrap:siblings` + `pnpm install`.
+- `osint-web-core/package.json`: `peerDependencies` lists `react`, `react-dom`, `react-redux` (ranges aligned with shell); core does not add them to its own `dependencies`.
+- 6 frontend packages exist: `osint-mvp-web-shell`, `osint-gis-web`, `osint-video-web`, `osint-intelligence-web`, `osint-search-web`, `osint-web-core`.
+- 1 backend service exists: `osint-auth-backend` (Spring Boot, dummy users).
+- Each package has `package.json`, `tsconfig.json`, `src/index.ts` (frontend); auth-backend has `pom.xml` / `build.gradle` + `application.yml`.
+- Each domain module exports its `AppModule` manifest.
+- Each domain module has `config.ts` and required libraries (for GIS, **CesiumJS**) listed in `package.json`.
+- Each module has a slice with a `dummy` field; `RootState` in `osint-web-core` is augmented in the shell.
+- Shell `configureStore` combines all module reducers; app wrapped with `<Provider>`.
+- Shell mounts `QueryClient` + `QueryClientProvider`; DevTools visible in dev.
+- Shell builds TanStack Router dynamically from manifests; `<ProtectedRoute>` wraps every route.
+- `osint-auth-backend` is up (`:8081`); `POST /auth/login`, `GET /me`, `POST /auth/logout` work.
+- Shell has `LoginPage` + `authApi` + `authInterceptor` + `useCurrentUser`; JWT resume from localStorage works.
+- Login as `admin/admin123` → access all modules; login as `viewer/viewer123` → only permitted modules show in menu; others get `ForbiddenPage`.
+- Each module’s page renders **all five dummies** concatenated as `Hello {shell} + {gis} + {video} + {intel} + {search}`.
+- Intelligence entity + API + 3 TanStack hooks (`useIntelligenceById`, `useIntelligenceQuery`, `useDeleteIntelligence`) export from `osint-intelligence-web`; GIS/Video/Search use the hook on a page.
+- Vitest “manifest integration test” is green.
+- `pnpm dev` opens the shell; login → navigation to one page per module works.
+- HMR proof: edit `osint-gis-web/src/pages/MapPage.tsx` → browser refreshes with state preserved without a manual build.

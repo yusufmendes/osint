@@ -6,14 +6,13 @@ import { fileURLToPath } from 'node:url';
 import type { Plugin } from 'vite';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-/** `osint-mvp/osint-mvp-web-shell` -> workspace kökü (`d:\osint\`) */
+/** `osint-mvp/osint-mvp-web-shell` -> workspace root (`d:\osint\`) */
 const workspaceRoot = path.resolve(__dirname, '../..');
 
 /**
- * pnpm `file:` paketleri `node_modules` altında junction/symlink olarak durur.
- * Windows'ta Vite'ın varsayılan watcher'ı bazen bu hedef klasörlerdeki
- * kaynak değişikliklerini yakalamaz; sibling `src/` dizinlerini açıkça
- * watcher'a eklemek HMR'ı güvenilir hale getirir.
+ * pnpm `file:` packages live under `node_modules` as junctions/symlinks.
+ * On Windows Vite's default watcher sometimes misses source changes in those targets;
+ * explicitly adding sibling `src/` directories to the watcher makes HMR more reliable.
  */
 function watchSiblingWorkspaceSrc(): Plugin {
   const siblingSrcDirs = [
@@ -36,7 +35,7 @@ function watchSiblingWorkspaceSrc(): Plugin {
   };
 }
 
-/** pnpm `file:` junction yerine dogrudan kaynak girisi — HMR modul URL ile izlenen yol tutarli kalir */
+/** Direct source aliases instead of pnpm `file:` junction — keeps HMR module URLs consistent */
 const siblingSourceAliases: Record<string, string> = {
   'osint-web-core': path.join(workspaceRoot, 'osint-core-modules/osint-web-core/src/index.ts'),
   'osint-intelligence-web': path.join(
@@ -53,8 +52,8 @@ const useSiblingSourceAliases = process.env.VITEST !== 'true';
 export default defineConfig({
   plugins: [react(), watchSiblingWorkspaceSrc()],
   resolve: {
-    // Vitest: alias kapali — yoksa sibling kendi node_modules React'i ile shell Provider cakisir.
-    // pnpm dev / build: alias acik — HMR icin modul yolu workspace @fs ile tutarli.
+    // Vitest: aliases off — otherwise sibling pulls its own React from node_modules and clashes with shell Provider.
+    // pnpm dev / build: aliases on — keeps module paths aligned with workspace @fs for HMR.
     ...(useSiblingSourceAliases
       ? {
           alias: Object.entries(siblingSourceAliases).map(([find, replacement]) => ({
@@ -65,18 +64,18 @@ export default defineConfig({
       : {}),
   },
   server: {
-    // Windows'ta `localhost` bazen yalnizca ::1'e bind eder; 127.0.0.1 ile baglanti reddedilir.
+    // On Windows `localhost` may bind only to ::1; connections to 127.0.0.1 are refused.
     host: '127.0.0.1',
     port: 5173,
     fs: {
-      // Mutlak yol: Windows'ta göreli `../..` edge-case'lerinde izin sorunlarını önler
+      // Absolute path: avoids permission edge cases with relative `../..` on Windows
       allow: [workspaceRoot],
     },
     watch: {
       followSymlinks: true,
-      // Windows + pnpm junction: native watch bazen kaçırır; hafif polling HMR'ı stabilize eder.
-      // Kapatmak için: VITE_WATCH_POLLING=0
-      // Diğer OS'ta zorla açmak için: VITE_WATCH_POLLING=1
+      // Windows + pnpm junction: native watch sometimes misses changes; light polling stabilizes HMR.
+      // Disable: VITE_WATCH_POLLING=0
+      // Force on other OS: VITE_WATCH_POLLING=1
       ...((process.platform === 'win32' && process.env.VITE_WATCH_POLLING !== '0') ||
       process.env.VITE_WATCH_POLLING === '1'
         ? { usePolling: true, interval: 500 }

@@ -24,7 +24,7 @@ public class JwtService {
         this.props = props;
         byte[] secretBytes = props.getJwtSecret().getBytes(StandardCharsets.UTF_8);
         if (secretBytes.length < 32) {
-            throw new IllegalStateException("osint.auth.jwtSecret en az 32 byte olmali (HS256).");
+            throw new IllegalStateException("osint.auth.jwtSecret must be at least 32 bytes (HS256).");
         }
         this.signingKey = Keys.hmacShaKeyFor(secretBytes);
     }

@@ -1,12 +1,11 @@
 /**
- * Cross-repo `RootState` paylaşımı için boş bir interface deklare edilir.
- * Shell `osint-mvp-web-shell` her modülün state tipini bu interface'e
- * `declare module 'osint-web-core'` ile augment eder. Modüller burada
- * tanımlı `RootState`'i import ederek tip-güvenli `useSelector` yapabilir
- * ama hiçbir modül diğerinin slice'ına bağımlı değildir.
+ * Declares an empty interface for cross-repo `RootState` sharing.
+ * Shell `osint-mvp-web-shell` augments this interface per module state type via
+ * `declare module 'osint-web-core'`. Modules import the `RootState` defined here
+ * for type-safe `useSelector` without depending on another module's slice.
  */
 export interface AppRootStateSchema {
-  // shell augment eder; örn:
+  // augmented by shell; e.g.:
   // shell: ShellState;
   // gis:   GisState;
 }

@@ -1,15 +1,14 @@
 #!/usr/bin/env node
 /**
- * Sibling repo'lardaki paketleri (osint-web-core, osint-intelligence-web,
- * osint-gis-web, osint-video-web, osint-search-web) bagimlilik grafine gore
- * sirayla `pnpm install` ederek hazirlar.
+ * Prepares sibling-repo packages (osint-web-core, osint-intelligence-web,
+ * osint-gis-web, osint-video-web, osint-search-web) by running `pnpm install`
+ * in dependency order.
  *
- * pnpm `file:` protokolu yalnizca sibling klasorunu node_modules'a symlink
- * eder; siblingin kendi node_modules/ icerigi otomatik dolmaz. Shell'in
- * Vite source'tan tukettigi siblinglerin React/MUI/RTK gibi peer/runtime
- * deps'i bu adimla cozulur.
+ * pnpm `file:` only symlinks the sibling folder into node_modules; it does not
+ * populate the sibling's own node_modules. This step resolves React/MUI/RTK
+ * peers for siblings consumed as source from the shell Vite app.
  *
- * Kullanim: pnpm bootstrap:siblings
+ * Usage: pnpm bootstrap:siblings
  */
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
@@ -32,7 +31,7 @@ let failed = 0;
 for (const rel of order) {
   const dir = resolve(workspaceRoot, rel);
   if (!existsSync(dir)) {
-    console.warn(`[skip] ${rel} (klasor bulunamadi)`);
+    console.warn(`[skip] ${rel} (directory not found)`);
     continue;
   }
   console.log(`\n== pnpm install :: ${rel} ==`);
@@ -48,7 +47,7 @@ for (const rel of order) {
 }
 
 if (failed > 0) {
-  console.error(`\n${failed} sibling install basarisiz oldu.`);
+  console.error(`\n${failed} sibling install(s) failed.`);
   process.exit(1);
 }
-console.log('\nSibling repo installation tamamlandi.');
+console.log('\nSibling repository installation finished.');

@@ -16,6 +16,6 @@ module.exports = {
   env: { browser: true, node: true, es2022: true },
   rules: {
     'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
-    // Shell her seyi import edebilir; per-repo boundary kurali yok.
+    // Shell may import anything; no per-repo boundary rule here.
   },
 };

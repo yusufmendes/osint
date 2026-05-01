@@ -51,7 +51,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 request.setAttribute("osint.username", username);
                 request.setAttribute("osint.permissions", perms);
             } catch (JwtException ignored) {
-                // gecersiz token - SecurityContext bos kalir, downstream 401 verir
+                // Invalid token — SecurityContext stays empty; downstream returns 401
                 SecurityContextHolder.clearContext();
             }
         }

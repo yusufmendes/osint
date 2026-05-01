@@ -21,11 +21,11 @@ export default function IntelligenceCrudPage() {
   return (
     <section style={{ padding: 24 }}>
       <h1>
-        Merhaba {root.shell.dummy} + {root.gis.dummy} + {root.video.dummy} + {root.intelligence.dummy} + {root.search.dummy}
+        Hello {root.shell.dummy} + {root.gis.dummy} + {root.video.dummy} + {root.intelligence.dummy} + {root.search.dummy}
       </h1>
       <h2>Intelligence CRUD</h2>
-      {list.isLoading && <p>Yükleniyor...</p>}
-      {list.isError && <p style={{ color: 'crimson' }}>Hata: {String(list.error)}</p>}
+      {list.isLoading && <p>Loading...</p>}
+      {list.isError && <p style={{ color: 'crimson' }}>Error: {String(list.error)}</p>}
       {list.data && (
         <ul>
           {list.data.items.map((it) => (
@@ -33,7 +33,7 @@ export default function IntelligenceCrudPage() {
               <strong>{it.header}</strong> &mdash; {it.description}
               {' '}
               <button onClick={() => del.mutate(it.id)} disabled={del.isPending}>
-                Sil
+                Delete
               </button>
             </li>
           ))}

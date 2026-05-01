@@ -2,7 +2,7 @@
   "name": "osint-gis-web",
   "version": "0.1.0",
   "private": true,
-  "description": "GIS modülü — CesiumJS tabanlı 3D harita.",
+  "description": "GIS module — CesiumJS-based 3D map.",
   "type": "module",
   "main": "./src/index.tsx",
   "types": "./src/index.tsx",

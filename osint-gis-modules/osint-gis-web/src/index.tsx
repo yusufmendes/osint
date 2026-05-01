@@ -9,8 +9,8 @@ export const gisModule: AppModule = {
   title: 'GIS',
   permissions: ['gis.map.view', 'gis.layers.view'],
   menu: [
-    { path: '/gis/map',    label: 'Harita',    permissions: ['gis.map.view'] },
-    { path: '/gis/layers', label: 'Katmanlar', permissions: ['gis.layers.view'] },
+    { path: '/gis/map',    label: 'Map',    permissions: ['gis.map.view'] },
+    { path: '/gis/layers', label: 'Layers', permissions: ['gis.layers.view'] },
   ],
   routes: [
     { path: '/gis/map',    element: <MapPage />,    permissions: ['gis.map.view'] },

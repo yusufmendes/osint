@@ -2,7 +2,7 @@
   "name": "osint-intelligence-web",
   "version": "0.1.0",
   "private": true,
-  "description": "Intelligence domain modülü — paylaşılan veri katmanı (entity, API, hook'lar).",
+  "description": "Intelligence domain module — shared data layer (entity, API, hooks).",
   "type": "module",
   "main": "./src/index.tsx",
   "types": "./src/index.tsx",

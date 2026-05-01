@@ -1,14 +1,14 @@
 <#
 .SYNOPSIS
-  Mevcut PowerShell oturumunu osint-tools izole toolchain'ine baglar.
+  Binds the current PowerShell session to the osint-tools isolated toolchain.
 
 .DESCRIPTION
-  JAVA_HOME, MAVEN_HOME, PNPM_HOME degiskenlerini set eder ve PATH'in basina
-  ilgili bin klasorlerini ekler. Host makinedeki global Java/Maven/Node/pnpm
-  varsa bile bu oturum izole binary'leri kullanir.
+  Sets JAVA_HOME, MAVEN_HOME, PNPM_HOME, and related variables, and prepends
+  the corresponding bin directories to PATH. Even if the host has global
+  Java/Maven/Node/pnpm, this session uses the isolated binaries.
 
-  Kullanim:
-      . .\osint-tools\env.ps1     # mutlaka dot-source
+  Usage:
+      . .\osint-tools\env.ps1     # must be dot-sourced
 #>
 
 [CmdletBinding()]
@@ -17,18 +17,18 @@ param()
 $ToolsRoot = Join-Path $PSScriptRoot ".tools"
 
 if (-not (Test-Path -LiteralPath $ToolsRoot)) {
-    Write-Error "Toolchain bulunamadi: $ToolsRoot. Once bootstrap.ps1 calistirin."
+    Write-Error "Toolchain not found: $ToolsRoot. Run bootstrap.ps1 first."
     return
 }
 
 function Resolve-SingleChild($parent, $hint) {
     if (-not (Test-Path -LiteralPath $parent)) {
-        Write-Error "$hint klasoru bulunamadi: $parent. bootstrap.ps1 calistirin."
+        Write-Error "$hint directory not found: $parent. Run bootstrap.ps1."
         return $null
     }
     $children = @(Get-ChildItem -LiteralPath $parent -Directory)
     if ($children.Count -eq 0) {
-        Write-Error "$hint icinde kurulum bulunamadi: $parent"
+        Write-Error "No installation under $hint at: $parent"
         return $null
     }
     return $children[0].FullName
@@ -49,10 +49,10 @@ $env:NODE_HOME  = $nodeHome
 $env:PNPM_HOME  = $pnpmHome
 $env:COREPACK_HOME = Join-Path $ToolsRoot "corepack"
 
-# pnpm content-addressable store - tum repolar paylasir
+# pnpm content-addressable store — shared by all repos
 $env:PNPM_STORE_PATH = $pnpmStore
 
-# pnpm/npm home (global modul yokulu) - host AppData'ya yazmasin diye
+# pnpm/npm home (global installs) — keep off host AppData
 $env:NPM_CONFIG_PREFIX        = Join-Path $ToolsRoot "npm-prefix"
 $env:NPM_CONFIG_CACHE         = Join-Path $ToolsRoot "npm-cache"
 $env:NPM_CONFIG_USERCONFIG    = Join-Path $ToolsRoot "config\npmrc-user"
@@ -74,7 +74,7 @@ foreach ($d in @(
     if (-not (Test-Path -LiteralPath $d)) { New-Item -ItemType Directory -Path $d -Force | Out-Null }
 }
 
-# PATH onceligi: izole binary'ler her zaman host kurulumlarini override eder
+# PATH precedence: isolated binaries always override host installs
 $prefix = @(
     (Join-Path $jdkHome   "bin"),
     (Join-Path $mavenHome "bin"),
@@ -85,7 +85,7 @@ $prefix = @(
 
 $env:PATH = "$prefix$([IO.Path]::PathSeparator)$($env:PATH)"
 
-Write-Host "osint-tools env aktif:" -ForegroundColor Green
+Write-Host "osint-tools environment active:" -ForegroundColor Green
 Write-Host ("  JAVA_HOME  = {0}" -f $env:JAVA_HOME)
 Write-Host ("  MAVEN_HOME = {0}" -f $env:MAVEN_HOME)
 Write-Host ("  NODE_HOME  = {0}" -f $env:NODE_HOME)
@@ -123,7 +123,7 @@ $nodeBin = Join-Path $nodeHome  "node.exe"
 $pnpmBin = Join-Path $pnpmHome  "pnpm.exe"
 
 Write-Host ""
-Write-Host "Surum dogrulamasi (izole binary'ler):" -ForegroundColor Cyan
+Write-Host "Version check (isolated binaries):" -ForegroundColor Cyan
 Write-Host ("  java : {0}" -f (_Osint-CaptureCommand $javaBin "-version"))
 Write-Host ("  node : {0}" -f (_Osint-CaptureCommand $nodeBin "-v"))
 Write-Host ("  pnpm : {0}" -f (_Osint-CaptureCommand $pnpmBin "-v"))

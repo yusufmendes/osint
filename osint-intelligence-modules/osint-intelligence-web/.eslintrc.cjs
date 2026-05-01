@@ -7,11 +7,11 @@ module.exports = {
   extends: ['eslint:recommended', 'plugin:@typescript-eslint/recommended'],
   env: { browser: true, node: true, es2022: true },
   rules: {
-    // intelligence paylasilan veri domain'i: visualization siblings'i import edemez.
+    // intelligence is the shared data domain: must not import visualization siblings.
     'no-restricted-imports': ['error', {
       patterns: [{
         group: ['osint-gis-web', 'osint-video-web', 'osint-search-web', 'osint-mvp-web-shell'],
-        message: 'osint-intelligence-web: visualization siblings (gis/video/search) import edilemez.',
+        message: 'osint-intelligence-web: importing visualization siblings (gis/video/search) is forbidden.',
       }],
     }],
   },

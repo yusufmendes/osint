@@ -1,22 +1,19 @@
 <#
 .SYNOPSIS
-  osint-tools bootstrap — host makineye dokunmadan izole bir toolchain kurar.
+  osint-tools bootstrap — installs an isolated toolchain without touching the host.
 
 .DESCRIPTION
-  Bu script JDK 21 (Eclipse Temurin), Apache Maven, Node.js LTS ve pnpm'i
-  osint-tools/.tools/ altına indirip açar. Hiçbir kurulum host PATH'ini
-  veya registry'sini değiştirmez.
+  Downloads and extracts JDK 21 (Eclipse Temurin), Apache Maven, Node.js LTS,
+  and pnpm under osint-tools/.tools/. Does not modify the global host PATH or registry.
 
-  Tamamlandıktan sonra her shell'de `. .\osint-tools\env.ps1` ile bu izole
-  toolchain'e bağlanılır.
+  After completion, dot-source `. .\osint-tools\env.ps1` in each shell to use this toolchain.
 
 .PARAMETER Force
-  Önbellek/extract klasörlerini silip baştan indirir.
+  Deletes cache/extract folders and reinstalls from scratch.
 
 .NOTES
-  Sürümler doc'taki "Sürüm kuralı"na göre seçilmiştir: en güncel stabil ve
-  birbirleriyle uyumlu sürümler. Sürüm güncellemek istersen aşağıdaki
-  parametreleri override et.
+  Versions follow the design-doc "version rule": latest stable mutually compatible set.
+  Override parameters below to change versions.
 #>
 
 [CmdletBinding()]
@@ -72,7 +69,7 @@ function Expand-Zip($zip, $dst) {
 function Get-SingleSubdir($parent) {
     $children = @(Get-ChildItem -LiteralPath $parent -Directory)
     if ($children.Count -ne 1) {
-        throw "Beklenen tek alt klasor degil: $parent (bulundu: $($children.Count))"
+        throw "Expected exactly one subdirectory under $parent (found: $($children.Count))"
     }
     return $children[0].FullName
 }
@@ -229,6 +226,6 @@ foreach ($pair in @(
 }
 
 Write-Host ""
-Write-Host "Bootstrap tamamlandi. Yeni shell'de toolchain'e baglanmak icin:" -ForegroundColor Green
+Write-Host "Bootstrap complete. To attach the toolchain in a new shell:" -ForegroundColor Green
 Write-Host "    . `"$($PSScriptRoot)\env.ps1`"" -ForegroundColor Yellow
 Write-Host ""

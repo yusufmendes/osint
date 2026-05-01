@@ -2,7 +2,7 @@
   "name": "osint-web-core",
   "version": "0.1.0",
   "private": true,
-  "description": "Ortak tipler, hooklar ve yardımcılar (AppModule, RootState, useCurrentUser).",
+  "description": "Shared types, hooks, and helpers (AppModule, RootState, useCurrentUser).",
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",

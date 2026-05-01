@@ -24,7 +24,7 @@ function makeStore() {
 }
 
 describe('manifest integration', () => {
-  it('tum modul reducerlari store\'da kayitli', () => {
+  it('registers all module reducers in the store', () => {
     const store = makeStore();
     const s = store.getState();
     expect(s.shell.dummy).toBe('shell-hello');
@@ -34,7 +34,7 @@ describe('manifest integration', () => {
     expect(s.search.dummy).toBe('search-hello');
   });
 
-  it('her modul AppModule manifestini export ediyor', () => {
+  it('each module exports an AppModule manifest', () => {
     const ids = [gisModule.id, videoModule.id, intelligenceModule.id, searchModule.id];
     expect(ids.sort()).toEqual(['gis', 'intelligence', 'search', 'video']);
     for (const m of [gisModule, videoModule, intelligenceModule, searchModule]) {
@@ -46,7 +46,7 @@ describe('manifest integration', () => {
     }
   });
 
-  it('shell layout cross-module dummylari concat eder (manifest -> route element)', async () => {
+  it('shell layout concatenates cross-module dummy values (manifest -> route element)', async () => {
     const store = makeStore();
     store.dispatch(shellActions.authSuccess({
       token: 'test',
@@ -55,7 +55,7 @@ describe('manifest integration', () => {
 
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
-    // GIS modulunun manifest'inden ilk route'u al -> bu MapPage'i lazy render eder.
+    // First route from GIS module manifest -> lazy MapPage render.
     const mapRouteElement = gisModule.routes[0].element;
 
     render(
@@ -69,7 +69,7 @@ describe('manifest integration', () => {
     );
 
     const h1 = await screen.findByRole('heading', { level: 1 });
-    expect(h1.textContent).toContain('Merhaba');
+    expect(h1.textContent).toContain('Hello');
     expect(h1.textContent).toContain('shell-hello');
     expect(h1.textContent).toContain('gis-hello');
     expect(h1.textContent).toContain('video-hello');

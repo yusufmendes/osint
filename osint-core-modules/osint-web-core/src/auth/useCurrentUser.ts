@@ -15,9 +15,9 @@ interface ShellAuthSlice {
 }
 
 /**
- * Shell `shellSlice`'ından `user` ve `authStatus`'ı okur. Modüller bu
- * hook üzerinden permission kontrolü yapar; auth state'inin nereden
- * geldiğini bilmez (Keycloak/OIDC geçişinde modül kodu değişmez).
+ * Reads `user` and `authStatus` from the shell `shellSlice`. Modules use this
+ * hook for permission checks without knowing where auth state comes from
+ * (module code stays unchanged when moving to Keycloak/OIDC).
  */
 export function useCurrentUser() {
   const state = useSelector((s: RootState) => {

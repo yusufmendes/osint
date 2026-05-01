@@ -58,7 +58,7 @@ export function LoginPage() {
           <form onSubmit={onSubmit}>
             <Stack spacing={2}>
               <TextField
-                label="Kullanıcı adı"
+                label="Username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 autoComplete="username"
@@ -66,7 +66,7 @@ export function LoginPage() {
                 required
               />
               <TextField
-                label="Şifre"
+                label="Password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -76,10 +76,10 @@ export function LoginPage() {
               />
               {error && <Alert severity="error">{error}</Alert>}
               <Button type="submit" variant="contained" disabled={isLoading} fullWidth>
-                {isLoading ? <CircularProgress size={24} /> : 'Giriş'}
+                {isLoading ? <CircularProgress size={24} /> : 'Sign in'}
               </Button>
               <Typography variant="caption" color="text.secondary">
-                admin/admin123 → tüm modüller, viewer/viewer123 → kısıtlı
+                admin/admin123 — all modules; viewer/viewer123 — restricted
               </Typography>
             </Stack>
           </form>

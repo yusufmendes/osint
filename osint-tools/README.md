@@ -1,34 +1,33 @@
 # osint-tools
 
-Tum sibling repo'larin paylastigi izole toolchain. Host makineye dokunmaz.
+Shared isolated toolchain for all sibling repos. Does not modify the host machine.
 
-## Kurulum
+## Setup
 
 ```powershell
-# Workspace root'tan
+# From workspace root
 cd osint-tools
 .\bootstrap.ps1
 ```
 
-Bu komut sirasiyla `~/.tools/` altina:
+This downloads and extracts under `osint-tools/.tools/`:
 
 - JDK 21 (Eclipse Temurin)
 - Apache Maven 3.9.x
 - Node.js 22 LTS
 - pnpm 10.x
 
-indirir ve hicbir sey host PATH'ine yazmaz.
+Nothing is written to the global host `PATH`.
 
-## Kullanim
+## Usage
 
-Yeni bir PowerShell oturumunda:
+In a new PowerShell session:
 
 ```powershell
 . .\osint-tools\env.ps1
 ```
 
-`JAVA_HOME`, `MAVEN_HOME`, `NODE_HOME`, `PNPM_HOME`, `PNPM_STORE_PATH` set
-edilir; `PATH`'in basina izole bin klasorleri eklenir. Bu noktadan sonra:
+`JAVA_HOME`, `MAVEN_HOME`, `NODE_HOME`, `PNPM_HOME`, and `PNPM_STORE_PATH` are set, and isolated `bin` directories are prepended to `PATH`. After that:
 
 ```powershell
 java -version    # 21.x
@@ -37,16 +36,15 @@ node -v          # 22.x
 pnpm -v          # 10.x
 ```
 
-## Sürümler
+## Versions
 
-`bootstrap.ps1` parametre olarak sürüm/URL alir; varsayilanlari override
-etmek icin:
+`bootstrap.ps1` accepts version/URL parameters; to override defaults:
 
 ```powershell
 .\bootstrap.ps1 -MavenVersion 3.9.15 -MavenUrl https://archive.apache.org/dist/maven/maven-3/3.9.15/binaries/apache-maven-3.9.15-bin.zip
 ```
 
-## Yeniden kurulum
+## Reinstall
 
 ```powershell
 .\bootstrap.ps1 -Force

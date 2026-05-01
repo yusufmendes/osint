@@ -6,11 +6,11 @@ export const TOKEN_STORAGE_KEY = 'osint.auth.token';
 let installed = false;
 
 /**
- * Tek bir global fetch interceptor: tum API isteklerine Bearer JWT eklenir.
- * 401 donerse token temizlenir ve shell `unauthenticated` durumuna gecer;
- * RootRoute bunu gorup `/login`'e yonlendirir.
+ * Single global fetch wrapper: adds Bearer JWT to all API requests.
+ * On 401, clears the token and moves the shell to `unauthenticated`;
+ * RootRoute reacts and redirects to `/login`.
  *
- * Modul kodu token bilmek zorunda degil.
+ * Module code does not need to know about the token.
  */
 export function installAuthInterceptor() {
   if (installed) return;
@@ -41,7 +41,7 @@ export function persistToken(token: string | null) {
     if (token) localStorage.setItem(TOKEN_STORAGE_KEY, token);
     else localStorage.removeItem(TOKEN_STORAGE_KEY);
   } catch {
-    // localStorage erisilemiyorsa (private mode vs.) sessizce gec
+    // localStorage unavailable (private mode, etc.) — ignore
   }
 }
 

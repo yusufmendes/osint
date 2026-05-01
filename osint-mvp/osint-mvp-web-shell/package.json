@@ -2,7 +2,7 @@
   "name": "osint-mvp-web-shell",
   "version": "0.1.0",
   "private": true,
-  "description": "Shell uygulaması — layout, auth, routing, global RTK store, global QueryClient.",
+  "description": "Shell app — layout, auth, routing, global RTK store, global QueryClient.",
   "type": "module",
   "scripts": {
     "dev": "vite",

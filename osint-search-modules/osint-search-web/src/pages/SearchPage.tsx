@@ -19,10 +19,10 @@ export default function SearchPage() {
   return (
     <section style={{ padding: 24 }}>
       <h1>
-        Merhaba {root.shell.dummy} + {root.gis.dummy} + {root.video.dummy} + {root.intelligence.dummy} + {root.search.dummy}
+        Hello {root.shell.dummy} + {root.gis.dummy} + {root.video.dummy} + {root.intelligence.dummy} + {root.search.dummy}
       </h1>
       <h2>Search</h2>
-      <p>Arama paneli iskeleti — boş scaffold.</p>
+      <p>Search panel skeleton — empty scaffold.</p>
       {intel.data && <p>Cross-module intelligence count: {intel.data.total}</p>}
     </section>
   );

@@ -1,7 +1,7 @@
 /**
- * Vite dev server'ı programatik ayağa kaldırır, chokidar `change` olayını dinler,
- * sibling repo içindeki SearchPage.tsx'e geçici bir satır yazar ve olayın
- * gelip gelmediğini doğrular. Tarayıcı/HMR istemcisi gerekmez.
+ * Starts the Vite dev server programmatically, listens for chokidar `change` events,
+ * writes a temporary line into sibling repo SearchPage.tsx, and verifies the event
+ * is observed. No browser/HMR client required.
  *
  *   node scripts/verify-sibling-watcher.mjs
  */
@@ -23,7 +23,7 @@ const searchPage = path.join(
 );
 
 if (!fs.existsSync(searchPage)) {
-  console.error('FAIL: SearchPage.tsx bulunamadi:', searchPage);
+  console.error('FAIL: SearchPage.tsx not found:', searchPage);
   process.exit(1);
 }
 
@@ -63,9 +63,9 @@ await server.close();
 
 const hit = changes.some((c) => c.replaceAll('\\', '/').includes('SearchPage.tsx'));
 if (!hit) {
-  console.error('FAIL: SearchPage.tsx icin watcher change alinmadi. Gelen olaylar:', changes.length);
+  console.error('FAIL: no watcher change for SearchPage.tsx. Event count:', changes.length);
   if (changes.length) console.error(changes.slice(-20).join('\n'));
   process.exit(1);
 }
 
-console.log('OK: sibling SearchPage.tsx watcher change alindi.');
+console.log('OK: sibling SearchPage.tsx watcher change received.');

@@ -9,14 +9,14 @@ import java.nio.file.StandardOpenOption;
 import java.util.List;
 
 /**
- * Solr admin kimlik bilgilerini, container icindeki run-app.sh
- * tarafindan kaynak olarak okunacak basit bir KEY=VALUE dosyasina yazar.
+ * Writes Solr admin credentials to a simple KEY=VALUE file for {@code run-app.sh}
+ * inside the container to source.
  *
- * <p>Su an icin sabit "admin"/"123" degerlerini uretir; ileride bir gizli
- * deposundan (vault, AWS SM, vs.) cekecek sekilde genisletilebilir.</p>
+ * <p>Currently emits fixed {@code admin} / {@code 123}; can later be extended to read
+ * from a secret store (Vault, AWS Secrets Manager, etc.).</p>
  *
- * <p>Cikti yolu argumanla verilebilir; verilmezse {@code /tmp/solr-credentials}
- * kullanilir. Bu yol run-app.sh ile uyumlu olmalidir.</p>
+ * <p>Output path is the first program argument; if omitted, {@code /tmp/solr-credentials}
+ * is used. This path must stay aligned with {@code run-app.sh}.</p>
  */
 public final class SolrCredentialFetcher {
 
@@ -45,6 +45,6 @@ public final class SolrCredentialFetcher {
                 StandardOpenOption.TRUNCATE_EXISTING,
                 StandardOpenOption.WRITE
         );
-        System.out.println("[SolrCredentialFetcher] credentials are wrote to : " + target.toAbsolutePath());
+        System.out.println("[SolrCredentialFetcher] credentials written to: " + target.toAbsolutePath());
     }
 }

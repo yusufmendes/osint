@@ -1,30 +1,21 @@
 # Design and implementation detail — osint-intelligence-solr-server
 
-Bu belge, modulun tasarimini, Maven/Docker akislarini ve yerel ile container
-ortamlari arasindaki farklari ozetler. Build ve run komutlari icin bkz.
-[README.md](README.md).
+This document summarizes the module design, Maven/Docker flows, and differences between local and container environments. For build and run commands, see [README.md](README.md).
 
-## Amaç
+## Goals
 
-- Yerel gelistirmede: Solr binary distrosunu **sadece `target/` altinda**
-  tutmak; indeks ve instance layout'u **`SOLR_HOME` ortam degiskeni** ile
-  kullanicinin sectigi kalici dizinde tutmak (`mvn clean` indeksi silmez).
-- Docker'da: resmi `solr` imaji uzerinde **credential uretimi** ve Solr
-  baslatma akisini `run-app.sh` ile sabitlemek.
+- **Local development:** Keep the Solr binary distro only under **`target/`**; keep index and instance layout under the **`SOLR_HOME` environment variable** in a user-chosen persistent directory (`mvn clean` does not delete indexes).
+- **Docker:** Pin credential generation and Solr startup via `run-app.sh` on top of the official `solr` image.
 
-## Kaynak gereksinim dokumani
+## Source requirements document
 
-Orijinal is gerekleri: `osint-intelligence-modules/isr-intelligence-solr-server.md`
-(ust dizinde). Uygulama sirasinda asagidaki teknik kararlar alindi:
+Original requirements: `osint-intelligence-modules/isr-intelligence-solr-server.md` (sibling path may vary). Technical decisions taken during implementation:
 
-- Solr 9.x **binary Maven Central'da zip olarak yok**; resmi arsivden `.tgz`
-  indirilir (`download-maven-plugin` + `unpack=true`).
-- Yerel profilde **ekstra credential dosyasi yok**; Solr fabrika guvenligi
-  (tipik olarak Basic Auth kapali).
-- `src/main/resources/conf/` baslangici, distrodaki
-  `server/solr/configsets/_default/conf` ile doldurulur (`-Pseed-conf`).
+- Solr 9.x **binary is not published as a zip on Maven Central**; the official archive `.tgz` is used (`download-maven-plugin` + `unpack=true`).
+- **No extra credential file** in the default profile; Solr uses factory security (typically no Basic Auth).
+- `src/main/resources/conf/` is seeded from the distro’s `server/solr/configsets/_default/conf` (`-Pseed-conf`).
 
-## Dizin yapisi (modul)
+## Module layout
 
 ```
 osint-intelligence-modules/osint-intelligence-solr-server/
@@ -37,104 +28,85 @@ osint-intelligence-modules/osint-intelligence-solr-server/
     ├── java/com/osint/intelligence/solr/config/SolrCredentialFetcher.java
     └── resources/
         ├── core.properties              (name=intelligence)
-        └── conf/                        (seed-conf ile _default'tan)
+        └── conf/                        (from _default via seed-conf)
             ├── solrconfig.xml
             ├── managed-schema.xml
             └── ...
 ```
 
-## Iki calisma modu
+## Two operating modes
 
-### A) Default profil (yerel)
+### A) Default profile (local)
 
-| Bilesen | Rol |
-|---------|-----|
-| `download-maven-plugin` | `solr.distro.url` (.tgz) indir + `target/` altina ac |
-| `maven-antrun` `sync-home` | `src/main/resources/conf/**` ve `core.properties` -> `${SOLR_HOME}/${solr.core.name}/`; distro `server/solr/solr.xml` -> `${SOLR_HOME}/solr.xml` (yalniz yoksa kopyala) |
-| `maven-shade-plugin` | Tek jar; Main-Class: `SolrCredentialFetcher` (Docker icin) |
+| Component | Role |
+|-----------|------|
+| `download-maven-plugin` | Download `solr.distro.url` (.tgz) and unpack under `target/` |
+| `maven-antrun` `sync-home` | Copy `src/main/resources/conf/**` and `core.properties` → `${SOLR_HOME}/${solr.core.name}/`; copy distro `server/solr/solr.xml` → `${SOLR_HOME}/solr.xml` (only if missing) |
+| `maven-shade-plugin` | Single jar; Main-Class: `SolrCredentialFetcher` (for Docker) |
 | `exec-maven-plugin` | `bin/solr start -p <port> -s <SOLR_HOME>` / `stop -p <port>` |
 
-**Veri koruma:** `sync-home` yalniz `conf/` ve `core.properties` uzerine yazar;
-mevcut `data/` ve indeks dosyalarina dokunmaz.
+**Data safety:** `sync-home` overwrites only `conf/` and `core.properties`; it does not touch existing `data/` or index files.
 
 **Fail-fast:**
 
-- `SOLR_HOME` tanimli degilse `sync-home` hata verir.
-- `src/main/resources/conf/solrconfig.xml` yoksa seed oncesi hata verir.
+- If `SOLR_HOME` is unset, `sync-home` fails.
+- If `src/main/resources/conf/solrconfig.xml` is missing, fail before seed.
 
-### B) `deployment` profili (Docker)
+### B) `deployment` profile (Docker)
 
-| Ozellik | Deger |
-|---------|--------|
-| `unpack.solr.skip` | `true` — yerel distro indirme yok |
-| `sync.home.skip` | `true` — yerel `SOLR_HOME` senkronu yok |
-| `docker-maven-plugin` | `package` fazinda `docker:build`; context modul kok, `Dockerfile` |
+| Aspect | Value |
+|--------|--------|
+| `unpack.solr.skip` | `true` — no local distro download |
+| `sync.home.skip` | `true` — no local `SOLR_HOME` sync |
+| `docker-maven-plugin` | `docker:build` in `package`; build context is module root, `Dockerfile` |
 
-Imaj icinde:
+Inside the image:
 
-1. Shade jar `/opt/osint/osint-intelligence-solr-server.jar`
-2. `run-app.sh` entrypoint
-3. `SolrCredentialFetcher` `/tmp/solr-credentials` dosyasina
-   `SOLR_USER=admin`, `SOLR_PASS=123` yazar (shell-friendly)
-4. Script bu satirlari okuyup export eder, `exec solr-foreground` ile Solr baslar
+1. Shaded jar at `/opt/osint/osint-intelligence-solr-server.jar`
+2. `run-app.sh` as entrypoint
+3. `SolrCredentialFetcher` writes `/tmp/solr-credentials` with `SOLR_USER=admin`, `SOLR_PASS=123` (shell-friendly)
+4. The script reads those lines, exports them, then `exec solr-foreground` starts Solr
 
-**Not:** Ham Solr `/tmp/solr-credentials` dosyasini dogrudan okumaz; shell
-katmani credential'lari ortama tasir (ileride `SOLR_OPTS` veya
-`security.json` entegrasyonu icin genisletilebilir).
+**Note:** Solr does not natively read `/tmp/solr-credentials`; the shell layer maps credentials into the environment (can be extended later with `SOLR_OPTS` or `security.json`).
 
-## Dockerfile ozeti
+## Dockerfile summary
 
-- `ARG SOLR_VERSION` / `FROM solr:${SOLR_VERSION}` — POM `solr.version` ile
-  hizali tutulmali.
-- **Iki JVM:** Resmi Solr imaji genelde **Java 17** ile gelir (Solr icin yeterli).
-  Shaded `SolrCredentialFetcher` jar ise projede **Java 21** (`--release 21`)
-  ile derlenir (class file **65**). Bu uyumsuzluk `UnsupportedClassVersionError`
-  ile patlar. Cozum: multi-stage ile `eclipse-temurin:21-jre` imajindan
-  `/opt/java/openjdk` kopyalanir → `/opt/osint/jre-21`; `run-app.sh` credential
-  adiminda yalnizca `JAVA_CREDENTIALS` (`/opt/osint/jre-21/bin/java`) kullanilir.
-  `solr-foreground` Solr'in kendi scriptleriyle imajdaki JVM'i kullanmaya devam eder.
-- `ARG CREDENTIALS_JAVA_IMAGE` (varsayilan `eclipse-temurin:21-jre`) ile JRE
-  kaynagi build zamaninda degistirilebilir.
-- `USER root`: JRE 21, jar, `conf/`, `core.properties`, `run-app.sh` kopyalanir;
-  `/var/solr/data/${SOLR_CORE_NAME}` altina core yerlestirilir.
-- Kullanici: resmi imajda `solr` varsa o; yoksa `isr` kullanici olusturulur
-  (belgedeki istege uyum).
+- `ARG SOLR_VERSION` / `FROM solr:${SOLR_VERSION}` — keep aligned with POM `solr.version`.
+- **Two JVMs:** The official Solr image usually ships **Java 17** (enough for Solr). The shaded `SolrCredentialFetcher` jar is built with **Java 21** (`--release 21`, class file **65**). Running it with the image `java` causes `UnsupportedClassVersionError`. **Fix:** multi-stage copy from `eclipse-temurin:21-jre`: `/opt/java/openjdk` → `/opt/osint/jre-21`; `run-app.sh` uses only `JAVA_CREDENTIALS` (`/opt/osint/jre-21/bin/java`) for the credential step. `solr-foreground` continues to use the image JVM via Solr’s scripts.
+- `ARG CREDENTIALS_JAVA_IMAGE` (default `eclipse-temurin:21-jre`) lets you override the JRE source at build time.
+- `USER root`: copy JRE 21, jar, `conf/`, `core.properties`, `run-app.sh`; place core under `/var/solr/data/${SOLR_CORE_NAME}`.
+- User: use `solr` if present in the official image; otherwise create `isr` (per original spec).
 
 ## `SolrCredentialFetcher`
 
-- Paket: `com.osint.intelligence.solr.config`
-- `main`: ilk arguman cikti dosya yolu; yoksa `/tmp/solr-credentials`
-- Cikti formati: `SOLR_USER=...` ve `SOLR_PASS=...` (satir basina bir atama)
+- Package: `com.osint.intelligence.solr.config`
+- `main`: first argument is output path; default `/tmp/solr-credentials`
+- Output format: `SOLR_USER=...` and `SOLR_PASS=...` (one assignment per line)
 
-## Maven profilleri
+## Maven profiles
 
-| Profil | Tetikleme | Etki |
-|--------|-------------|------|
+| Profile | Trigger | Effect |
+|---------|---------|--------|
 | `windows` | OS family | `solr.bin=solr.cmd` |
-| `seed-conf` | `-Pseed-conf` | `seed-conf` antrun calisir, `sync-home` bu fazda skip |
-| `deployment` | `-Pdeployment` | distro fetch + sync skip; Docker build |
+| `seed-conf` | `-Pseed-conf` | Runs `seed-conf` antrun; skips `sync-home` in that phase |
+| `deployment` | `-Pdeployment` | Skips distro fetch + sync; Docker build |
 
-## Dis bagimliliklar ve surumler
+## External dependencies and pinned versions
 
 - Solr binary: `https://archive.apache.org/dist/solr/solr/${solr.version}/solr-${solr.version}.tgz`
-- Plugin sabitleri (POM): `maven-compiler-plugin` 3.13.0, `maven-shade-plugin` 3.6.0,
-  `maven-antrun-plugin` 3.1.0, `exec-maven-plugin` 3.5.0,
-  `download-maven-plugin` 1.13.0, `docker-maven-plugin` (fabric8) 0.46.0
+- Plugin pins (POM): `maven-compiler-plugin` 3.13.0, `maven-shade-plugin` 3.6.0, `maven-antrun-plugin` 3.1.0, `exec-maven-plugin` 3.5.0, `download-maven-plugin` 1.13.0, `docker-maven-plugin` (fabric8) 0.46.0
 
-## Bilinen sinirlar ve gelecek notlari
+## Known limits and future notes
 
-- **Solr 10:** CLI, gelecekte varsayilan modun SolrCloud olacagini uyarir;
-  standalone icin `--user-managed` gibi flag'ler gerekebilir — surum
-  yukseltmesinde `exec` argumanlari guncellenmeli.
-- **Guvenlik:** `admin`/`123` yalnizca iskelet; production'da gercek kimlik
-  kaynagi + `security.json` / plugin yapilandirmasi gerekir.
-- **JDK:** POM `release=21`; daha eski JDK ile derleme basarisiz olur.
+- **Solr 10:** CLI warns that SolrCloud may become the default; standalone may need flags such as `--user-managed` — update `exec` arguments when upgrading.
+- **Security:** `admin`/`123` is scaffolding only; production needs real identity and `security.json` / plugin configuration.
+- **JDK:** POM uses `release=21`; building with an older JDK fails.
 
-## Dogrulama checklist (gelistirici)
+## Verification checklist (developer)
 
-1. `mvn process-resources -Pseed-conf` — `src/main/resources/conf` dolu
-2. `SOLR_HOME` set + `mvn package` — sync basarili
-3. `mvn exec:exec@solr-start` — port 8983 ayakta
+1. `mvn process-resources -Pseed-conf` — `src/main/resources/conf` populated
+2. `SOLR_HOME` set + `mvn package` — sync succeeds
+3. `mvn exec:exec@solr-start` — port 8983 up
 4. `GET /solr/intelligence/select?q=*:*` — HTTP 200
-5. `mvn exec:exec@solr-stop` — surec durur
-6. `mvn -Pdeployment package` — Docker imaji uretilir (Docker daemon gerekli)
+5. `mvn exec:exec@solr-stop` — process stops
+6. `mvn -Pdeployment package` — Docker image produced (Docker daemon required)

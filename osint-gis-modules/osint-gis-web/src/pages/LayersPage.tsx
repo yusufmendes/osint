@@ -7,11 +7,11 @@ export default function LayersPage() {
   const gis = useSelector((s: RootState) => (s as unknown as { gis: GisLike }).gis);
   return (
     <section style={{ padding: 24 }}>
-      <h1>GIS Katmanlar</h1>
-      <p>dummy: {gis.dummy}</p>
+      <h1>GIS Layers</h1>
+        <p>dummy: {gis.dummy}</p>
       {gis.layers.length === 0
-        ? <p>Henüz katman yok.</p>
-        : <ul>{gis.layers.map((l) => <li key={l.id}>{l.name} {l.visible ? '(görünür)' : '(gizli)'}</li>)}</ul>}
+        ? <p>No layers yet.</p>
+        : <ul>{gis.layers.map((l) => <li key={l.id}>{l.name} {l.visible ? '(visible)' : '(hidden)'}</li>)}</ul>}
     </section>
   );
 }

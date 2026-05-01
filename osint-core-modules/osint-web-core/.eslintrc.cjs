@@ -14,7 +14,7 @@ module.exports = {
   ],
   env: { browser: true, node: true, es2022: true },
   rules: {
-    // osint-web-core en alt katmandir: HICBIR osint-*-web modulunu import edemez.
+    // osint-web-core is the lowest layer: it must not import any osint-*-web package.
     'no-restricted-imports': ['error', {
       patterns: [{
         group: [
@@ -24,7 +24,7 @@ module.exports = {
           'osint-search-web',
           'osint-intelligence-web',
         ],
-        message: 'osint-web-core en alt taban: hiçbir osint-*-web paketini import edemez.',
+        message: 'osint-web-core is the base layer: importing any osint-*-web package is forbidden.',
       }],
     }],
   },

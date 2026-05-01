@@ -8,7 +8,7 @@ export const searchModule: AppModule = {
   title: 'Search',
   permissions: ['search.panel.view'],
   menu: [
-    { path: '/search/panel', label: 'Arama', permissions: ['search.panel.view'] },
+    { path: '/search/panel', label: 'Search', permissions: ['search.panel.view'] },
   ],
   routes: [
     { path: '/search/panel', element: <SearchPage />, permissions: ['search.panel.view'] },

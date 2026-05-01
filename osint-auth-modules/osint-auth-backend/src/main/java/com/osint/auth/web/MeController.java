@@ -22,7 +22,7 @@ public class MeController {
         @SuppressWarnings("unchecked")
         List<String> permissions = (List<String>) request.getAttribute("osint.permissions");
         if (userId == null || username == null) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Token yok veya gecersiz");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing or invalid token");
         }
         return ResponseEntity.ok(new MeResponse(userId, username,
                 permissions == null ? List.of() : permissions));

@@ -6,8 +6,8 @@ import { fetchMe } from './authApi';
 import { persistToken, readPersistedToken } from './authInterceptor';
 
 /**
- * Sayfa yenilendiginde localStorage'taki JWT'yi okur ve
- * /me ile dogrulayarak shell'i `authenticated`'e gecirir.
+ * On page reload, reads JWT from localStorage and validates it via `/me`,
+ * then moves the shell to `authenticated`.
  */
 export function useAuthBoot() {
   const dispatch = useDispatch<AppDispatch>();

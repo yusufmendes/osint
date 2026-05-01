@@ -8,7 +8,7 @@ export const intelligenceModule: AppModule = {
   title: 'Intelligence',
   permissions: ['intelligence.crud.view'],
   menu: [
-    { path: '/intelligence/crud', label: 'İstihbarat Yarat', permissions: ['intelligence.crud.view'] },
+    { path: '/intelligence/crud', label: 'Create Intelligence', permissions: ['intelligence.crud.view'] },
   ],
   routes: [
     { path: '/intelligence/crud', element: <IntelligenceCrudPage />, permissions: ['intelligence.crud.view'] },

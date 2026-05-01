@@ -47,7 +47,7 @@ export function RootLayout() {
   if (authStatus === 'loading' || authStatus === 'idle') {
     return (
       <Box sx={{ p: 4 }}>
-        <Typography>Oturum yükleniyor...</Typography>
+        <Typography>Loading session...</Typography>
       </Box>
     );
   }
@@ -70,7 +70,7 @@ export function RootLayout() {
           <Typography variant="h6">{shellConfig.appTitle}</Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <Typography variant="body2">{user?.username}</Typography>
-            <Button color="inherit" onClick={onLogout}>Çıkış</Button>
+            <Button color="inherit" onClick={onLogout}>Log out</Button>
           </Box>
         </Toolbar>
       </AppBar>
@@ -97,7 +97,7 @@ export function RootLayout() {
       </Drawer>
       <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
         <Toolbar />
-        <Suspense fallback={<Typography>Sayfa yükleniyor...</Typography>}>
+        <Suspense fallback={<Typography>Loading page...</Typography>}>
           <Outlet />
         </Suspense>
       </Box>

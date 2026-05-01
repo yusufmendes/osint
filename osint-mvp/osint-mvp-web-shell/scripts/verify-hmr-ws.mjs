@@ -1,7 +1,7 @@
 /**
- * Vite dev server + HMR WebSocket (vite-hmr) ile baglanir, SearchPage.tsx'e
- * dokunur; sunucunun WS uzerinden gonderdigi mesajlardan en az birinde
- * "update" veya "full-reload" arar. CI / otomasyon icin.
+ * Connects to the Vite dev server + HMR WebSocket (vite-hmr), touches SearchPage.tsx,
+ * and looks for at least one message containing "update" or "full-reload" among
+ * messages sent over WS. For CI / automation.
  *
  *   node scripts/verify-hmr-ws.mjs
  */
@@ -60,7 +60,7 @@ await new Promise((resolve, reject) => {
   setTimeout(() => reject(new Error('WS open timeout')), 8000);
 });
 
-/** Vite @fs URL — modul grafine dosyayi almadan HMR update gitmez */
+/** Vite @fs URL — without pulling the file into the module graph, HMR updates may not fire */
 function toViteFsPath(absFilePath) {
   const withFwd = absFilePath.replace(/\\/g, '/');
   return `/@fs/${withFwd.replace(/^([A-Za-z]):/, '$1:')}`;
@@ -95,12 +95,12 @@ const blob = inbound.join('\n');
 const ok =
   /"type"\s*:\s*"update"/.test(blob) ||
   /"type"\s*:\s*"full-reload"/.test(blob) ||
-  /"type"\s*:\s*"custom"/.test(blob); // bazı ortamlarda sadece custom
+  /"type"\s*:\s*"custom"/.test(blob); // some environments only emit custom
 
 if (!ok) {
-  console.error('FAIL: HMR WS mesajlarinda update/full-reload beklenen pattern yok.');
-  console.error('Toplam mesaj:', inbound.length);
+  console.error('FAIL: HMR WS messages did not match expected update/full-reload pattern.');
+  console.error('Total messages:', inbound.length);
   process.exit(1);
 }
 
-console.log('OK: HMR WebSocket mesajlari alindi (update/full-reload veya custom).');
+console.log('OK: HMR WebSocket messages received (update/full-reload or custom).');

@@ -29,7 +29,7 @@ public class AuthController {
                 .filter(u -> u.getUsername().equals(req.username())
                           && u.getPassword().equals(req.password()))
                 .findFirst()
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Gecersiz kullanici adi veya sifre"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid username or password"));
 
         String userId = "u-" + (props.getUsers().indexOf(user) + 1);
         String token = jwtService.issue(userId, user.getUsername(), user.getPermissions());
