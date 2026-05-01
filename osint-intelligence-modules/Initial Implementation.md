@@ -1,768 +1,647 @@
-# İstihbarat Veri Platformu — Mimari Tasarım Dokümanı
+# Intelligence Data Platform — Architecture Design Document
 
 > **MVP**: Spring Boot + PostgreSQL + Solr + PostGIS + Delta Sync
 
 ---
 
-## 1. Domain Tanımı
+## 1. Domain Definition
 
-### 1.1 Sistem Amacı
+### 1.1 System Purpose
 
-İstihbarat verilerinin dijital ortamda güvenli şekilde saklanması, aranması ve harita tabanlı basit coğrafi sorgularla analiz edilmesi için kurumsal düzey bir platform. Kullanıcılar çeşitli şablonlarda istihbarat kayıtları oluşturur, bu kayıtları partition/template bazlı sorgularla çeker ve client tarafında local cache ile hızlı gezinme deneyimi yaşar.Bu kapsamda D:\osint\osint-intelligence-modules altında osint-intelligence-server adında maven modülü yaratılacak ve  implementasyon bu modüle yapılacaktır
+An enterprise platform for storing intelligence records securely, searching them, and analysing them with simple map-based geographic queries. Users create intelligence records that follow various templates, fetch those records with partition/template-scoped queries and enjoy fast navigation thanks to a client-side local cache. Implementation lives in a new Maven module `osint-intelligence-server` under `D:\osint\osint-intelligence-modules`.
 
-Bu doküman **MVP kapsamını** tanımlar
+This document defines the **MVP scope**.
 
-### 1.2 Veri Karakteristiği
+### 1.2 Data Characteristics
 
-- **Uzun vadeli hedef**: 20-30 milyon kayıt (şablon başına ~600.000 ortalama)
-- **MVP hedefi**: Küçük-orta ölçekli dataset ile doğrulama (birkaç şablon × birkaç bin kayıt); mimari 30M'e doğru büyümeyi destekleyecek şekilde kurulur ama tuning MVP dışı
-- **Kayıt yapısı**: Atrtribute,AttributeType,AttributeTypeValue,Intelligence,Template (attributeIdToAttributeValueMap alannındaki değerler Intelligence tablosunda JSONB olarak tanımlanacak)
-- **Geo tipler**:  Intelligence entitysinde location ve relatedLocationList(fix alanlar)
-- String tipler: 4 model objesindeki tüm string static alanlar
+- **Long-term target**: 20-30 million records (~600,000 per template on average).
+- **MVP target**: validation on a small-to-medium dataset (a handful of templates × a few thousand records each); the architecture is built so it can grow toward 30M, but tuning is out of MVP scope.
+- **Record shape**: `Attribute`, `AttributeType`, `AttributeTypeValue`, `Intelligence`, `Template`. The `attributeIdToAttributeValueMap` field is stored as JSONB on the `intelligence` table.
+- **Geo fields** (fixed): `location` and `relatedLocationList` on `Intelligence`.
+- **String fields**: every static `String` field on the four domain classes.
 
-### 1.3 MVP Kullanıcı Senaryoları
+### 1.3 MVP User Scenarios
 
-- **Şablon bazlı veri çekme**: Kullanıcı templateId bazlı sorgu atıp tüm istihbaratları ister, sonraki isteklerde `lastQueryTime` parametresi ile **sadece değişen** kayıtlar gelir (delta sync)
-- **CRUD**: Intelligence/Template/Attribute/AttributeTypeValue kaydı ekle/güncelle/sil (soft delete)
-- **Basit geo sorgular**: Poligon içindeki noktalar, bir merkezden X km içindeki kayıtlar
-- **Full-text arama (Türkçe)**: Solr üzerinden BM25 ile arama
+- **Template-scoped fetch**: the client requests all intelligence for a `templateId`; on later requests it sends `lastQueryTime` to receive **only the changed** records (delta sync).
+- **CRUD**: create / update / soft-delete `Intelligence`, `Template`, `Attribute`, `AttributeTypeValue`.
+- **Simple geo queries**: points inside a polygon, records within X km of a centre point.
+- **Full-text search (Turkish)**: BM25 search via Solr.
 
-### 1.4 Domain Entity Modeli
+### 1.4 Domain Entity Model
 
-D:\osint\osint-intelligence-modules\osint-intelligence-model modülünde tüm intelligence domain modelleri yer almaktadır.Intelligence modelindeki attributeIdToAttributeValueMap alanında mevcut intelligence entitysindeki templateId ile referans verilen Attribute entitylerine atanan değerler yer almaktadır.Template entitylerinin attributeIdList sayısı yani Attribute sayısı dinamik olduğu için attributeIdToAttributeValueMap alanındaki attribute ve değerleri de dinamiktir.Bu yüzden attributeIdToAttributeValueMap  alanı Postgresde JSONB olmalıdır.Bu alanlarda aşağıdaki gibi dinamik sorgular atabilmeliyim
+The four domain classes live in [`osint-intelligence-model`](d:/osint/osint-intelligence-modules/osint-intelligence-model). On `Intelligence`, the `attributeIdToAttributeValueMap` field stores values for the `Attribute`s referenced from the row's `templateId`. Because `Template.attributeIdList` is dynamic (different templates have different attributes), this map is dynamic too — that is why the column is **JSONB** in Postgres. We must support dynamic queries against it.
 
-Örnek Bir Entity Seti : 
+#### Example entity set
 
 ```
 *******************
 AttributeTypeValue
-******************
+*******************
+id: femaleId
+version: 1
+value: "FEMALE"
+attributeId: "genderAttributeId"
 
-id:femaleId
-version:1
-value:"FEMALE"
-attributeId:"genderAttributeId"
+id: maleId
+version: 1
+value: "MALE"
+attributeId: "genderAttributeId"
 
-id:maleId
-version:1
-value:"MALE"
-attributeId:"genderAttributeId"
+id: noneId
+version: 1
+value: "NONE"
+attributeId: "genderAttributeId"
 
-id:noneId
-version:1
-value:"NONE"
-attributeId:"genderAttributeId"
-
-**********
+***********
 Attribute
-**********
-id:genderAttributeId
-version:1
-name:gender
-creationDate:d1,
-lastModificationDate:d1
-attributeType:ENUM
-attributeValueTypeIdList:[femaleId,maleId,noneId]
+***********
+id: genderAttributeId
+version: 1
+name: gender
+createdAt: t1
+lastModified: t1
+attributeType: ENUM
+attributeValueTypeIdList: [femaleId, maleId, noneId]
 
-id:weightAttributeId
-version:1
-name:weight
-creationDate:d1,
-lastModificationDate:d1
-attributeType:NUMBER
-attributeValueTypeIdList:[]
+id: weightAttributeId
+version: 1
+name: weight
+createdAt: t1
+lastModified: t1
+attributeType: NUMBER
+attributeValueTypeIdList: []
 
-********
+***********
 Template
-*********
-id:personTemplateId
-name:personTemplate
-creationDate:d1,
-lastModificationDate:d1
-childTemplateIdList:[childTemplate1Id,childTemplate2Id]
-attributeIdList:[genderAttributeId,weightAttributeId]
+***********
+id: personTemplateId
+name: personTemplate
+createdAt: t1
+lastModified: t1
+childTemplateIdList: [childTemplate1Id, childTemplate2Id]
+attributeIdList: [genderAttributeId, weightAttributeId]
 
-id:childTemplate1Id
-name:childTemplate1
-creationDate:d1,
-lastModificationDate:d1
-childTemplateIdList:[]
-attributeIdList:[]
+id: childTemplate1Id
+name: childTemplate1
+childTemplateIdList: []
+attributeIdList: []
 
-id:childTemplate2Id
-name:childTemplate2
-creationDate:d1,
-lastModificationDate:d1
-childTemplateIdList:[]
-attributeIdList:[]
+id: childTemplate2Id
+name: childTemplate2
+childTemplateIdList: []
+attributeIdList: []
 
 ************
 Intelligence
 ************
-
-id:childTemplate1IntelligenceId
-version:1
-header:"child template 1 intelligence header"
-description:"child template 1 intelligence description"
-creationDate:d1,
-lastModificationDate:d1
-keywords:["kw1","kw2"]
-attachedFileUniqueIdList:['fileId1']
-location:geometry JTS
-relatedLocationList :geometry JTS list
-templateId:childTemplate1Id
-
-id:childTemplate2IntelligenceId
-version:1
-header:"child template 2 intelligence header"
-description:"child template 2 intelligence description"
-creationDate:d1,
-lastModificationDate:d1
-keywords:["kw1","kw2"]
-attachedFileUniqueIdList:['fileId1']
-location:geometry JTS
-relatedLocationList :geometry JTS list
-templateId:childTemplate2Id
-
-id:mainIntelligenceId 
-version:1
-header:"intelligence header"   
-description:"intelligence description"
-creationDate:d1,
-lastModificationDate:d1
-keywords:["kw1","kw2"]
-attachedFileUniqueIdList:['fileId1']
-location:geometry JTS
-relatedLocationList :geometry JTS list
-templateId:personTemplateId
-relatedIntelligenceIdList:[childTemplate1IntelligenceId,childTemplate2IntelligenceId]
-attributeIdToAttributeValueMap:{{key :'genderAttributeId', value:femaleId},{key :'weightAttributeId', value:25}}
-
-
-Bu veri seti pure java model içindeki değerleri temsil ediyor
-
-POSTGRES karşılıkları
-*********************
-Bu entitylerdeki pirimitive alanlar POSTGRES tablolarında varsayılan tipleriyle kaydedilecektir(string,long vs..)
-Ama Intelligence entitysindeki attributeIdToAttributeValueMap alanı JSONB olarak tanımlanmalıdır
-
-Solr Document Karşılıkları
-*************************
-
-D:\osint\osint-intelligence-modules\osint-intelligence-solr-server\src\main\resources\conf\managed-schema.xml dosyasında
-<!-- Intelligence static fields-->  alanlar tanımlandı
-
-attributeIdToAttributeValueMap  alanları da   <!-- Intelligence dynamic fields--> kısmında tanımlandı
-
-Her nekadar Intelligence modelinde attributeIdToAttributeValueMap alanı  memory de attributeId mapi tutsa da hem solr da hem postresde jsonb içinde bu attribute lerin name alanı tutulacak(Join sorgusundan kurtulmak için)
-
-
-
-```
-
----
-
-**JSONB Sorgu Örnekleri (jOOQ üzerinden):**
-
-```java
-// Belirli bir attribute değerine göre filtre
-dsl.selectFrom(INTELLIGENCE)
-   .where(INTELLIGENCE.TEMPLATE_ID.eq(templateId))
-   .and(DSL.condition("attributeIdToAttributeValueMap ->>'gender' = {0}", DSL.val("FEMALE")))
-   .fetch();
-
-// JSONB GIN index → bu sorgu milisaniyeler içinde döner
-```
-
-#### PG → Solr Dönüşümü (Outbox Worker)
-
-Worker, her Intelligence kaydını Solr'a gönderirken JSONB attributes'u Attribute tablosundaki `type` bilgisine bakarak dynamic field'lara dönüştürür:
-
-### 1.5 Teknik Kısıtlar
-
-- **ACID**: Veri tutarlılığı için transaction zorunlu
-- **Self-hosted**: Tüm bileşenler on-prem çalışır
-
----
-
-## 2. Mimari Zorluklar (MVP)
-
-### 2.1 Tek Teknolojinin Yetersizliği
-
-Hiçbir tek sistem tüm ihtiyaçları optimum karşılayamaz:
-
-
-| İhtiyaç                    | Solr tek başına | PostgreSQL tek başına |
-| -------------------------- | --------------- | --------------------- |
-| ACID transaction           | Hayır           | Evet                  |
-| Karmaşık geo operasyonları | Sınırlı         | Evet (PostGIS)        |
-| full-text + faceting       | Evet            | Yeterli ama zayıf     |
-| Audit/compliance           | Zayıf           | Evet                  |
-
-
-### 2.2 Veri Tutarlılığı (Senkronizasyon) Problemi
-
-Birden fazla sistem kullandığımızda aynı veri birden fazla yerde tutulur. Yazma bir sistemde başarılı olup diğerinde fail ederse **inconsistency** oluşur. Çözüm: **Transactional Outbox Pattern**. Yazma PG'ye + outbox tablosuna aynı transaction'da düşer; async worker Solr'a aktarır.
-
-### 2.3 Eventual Consistency Penceresi
-
-PG'ye yazılan verinin Solr'da görünmesi anında olmaz — outbox worker çalışana kadar gecikme (normal koşullarda saniyeden az) vardır. Client yazdığı veriyi anında gösterir (optimistic UI), backend arka planda senkronize eder.
-
-### 2.4 Combined Search: Geo + Full-text + Dinamik Attribute Tek Sorguda
-
-Kullanıcı aynı anda haritadan çizdiği poligonu, free-text sorguyu ve dinamik attribute filtrelerini birleştirerek tek bir arama yapabilmelidir. Ancak bu üç filtre farklı sistemlerde işlenir: geo → PostGIS, text+dynamic attr → Solr. Tek sistemle çözülemez.
-
-**Çözüm: Backend orkestrasyon (paralel sorgu + id kesişimi)**
-
-Backend iki sorguyu paralel çalıştırır: Solr text+dynamic attr sonucu → id kümesi; PostGIS geo sorgusu → id kümesi. İki kümenin kesişimi frontend'e döner. Poligon genellikle PG sonucunu dramatik biçimde küçülttüğü için kesişim maliyeti yönetilebilir düzeydedir.
-
-### 2.5 Delta Sync ve Silme Tespiti
-
-Client istek atarken "hangi kayıt değişti" sorusu `lastModified > lastQueryTime` ile çözülür.Yani ilk sorguda template bazlı istek atar ve dönen intelligence ların en güncel olanının last modified alanını kaydeder ve bir sonraki sorguya `lastModified > lastQueryTime ekler.`  Ama **silinen kayıtlar** bu filter'la yakalanmaz. Çözüm: **soft delete pattern** — kayıt silinmez, `deleted=true` ile işaretlenir ve `lastModified` güncellenir
-
----
-
-## 3. Nihai Çözüm: Polyglot Persistence (MVP)
-
-### 3.1 Mimari Özet
-
-```
-PostgreSQL + PostGIS  →  Source of truth, geo, CRUD
-Solr 9.x (son sürüm)  →  Türkçe full-text, faceted search
-Spring Boot Backend   →  Orkestrasyon, outbox sync
-```
-
-### 3.2 Seçim Gerekçeleri
-
-**PostgreSQL + PostGIS — source of truth:**
-
-- ACID transaction; entity + geometry + outbox atomik
-- PostGIS: sektör standardı geo desteği, `ST_Contains`/`ST_DWithin` vb.
-- Disaster recovery: Solr corrupt olsa bile reindex her zaman mümkün
-
-**Solr 9.x — full-text:**
-
-- Gelişmiş Türkçe analyzer (Zemberek entegrasyonu)
-- BM25 relevance, highlighting, faceting
-- Mevcut sistemde zaten kullanılıyor; son sürüme geçilerek yeni mimaride temel
-
-**Spring Boot Backend — ince orkestrasyon:**
-
-- Tek orkestrasyon noktası; PG ve Solr'a erişim buradan
-- Outbox worker aynı JVM'de `@Scheduled` ile çalışır
-- **jOOQ tek veri erişim katmanı**: CRUD, geo, delta sync, outbox — hepsi tip güvenli DSL; JPA/Hibernate yok (K-9)
-- SolrJ + jOOQ + Spring ekosistemi
-
-### 3.3 Güçlü ve Zayıf Yönler
-
-**PostgreSQL + PostGIS**
-
-- Güçlü: ACID, PostGIS geo, backup/PITR
-- Zayıf: Full-text Solr seviyesinde değil, faceted search yok
-
-**Apache Solr 9**
-
-- Güçlü: Lucene inverted index, Türkçe analyzer, BM25, faceting, 30M+ ölçek
-- Zayıf: ACID yok, karmaşık geo zayıf, schema evolution reindex gerektirir
-
-**Spring Boot + jOOQ**
-
-- Güçlü: jOOQ compile-time tip güvenliği, sıfır ORM magic, PG-first, `@Async`/`@Scheduled`, SolrJ ekosistemi
-- Zayıf: JVM soğuk start; jOOQ codegen için ilk kurulum ~1 saat
-
----
-
-## 4. Net Karar Metinleri (MVP)
-
-### K-1: Source of Truth = PostgreSQL
-
-**Tüm yazma işlemlerinin authoritative kaynağı PostgreSQL'dir.** ACID garantisi ve disaster recovery için non-negotiable; Solr corrupt olsa bile PG'den reindex her zaman mümkün.
-
-### K-2: Geo Verisi PostGIS'te
-
-**Authoritative geometri PostGIS'te tutulur; Solr'da sadece centroid (lat/lon) indexlenir.** Basit spatial sorgular (poligon içinde, mesafe) PostGIS'e yönlendirilir.
-
-### K-3: Senkronizasyon = Transactional Outbox Pattern
-
-**PG → Solr senkronizasyonu outbox tablosu üzerinden eventual consistency ile yapılır.** Solr down olsa bile yazma başarılı olur, worker retry ile Solr'ı günceller — at-least-once garanti.
-
-### K-4: Full-text Search = Solr
-
-**Türkçe full-text arama, faceted search Solr'da çalışır.** Zemberek stemming, BM25 ranking Solr'ın güç alanı.
-
-### K-7: Silme Stratejisi = Soft Delete
-
-**Kayıtlar fiziksel silinmez; `deleted=true` + `deletedAt` + `deletedBy` ile işaretlenir ve `lastModified` güncellenir.** Delta sync `deleted:true` kayıtları da client'a gönderir
-
-### K-8: Delta Sync Protokolü = `lastQueryTime` Parametresi
-
-**İstemci her istekte `templateId` + opsiyonel `lastQueryTime` gönderir.** `lastQueryTime` yoksa tam snapshot; varsa sadece `lastModified > lastQueryTime` olan kayıtlar (soft-deleted dahil) döner.
-
-### K-9: Veri Erişim Katmanı = jOOQ (tek araç, her yerde)
-
-**Tüm PostgreSQL erişimi — CRUD, geo sorguları, delta sync, outbox, export — jOOQ `DSLContext` üzerinden yapılır; JPA/Hibernate kullanılmaz.** jOOQ PG şemasından Java sınıfları üretir (codegen); kolon adı veya tipi değiştiğinde derleme patlar, runtime'da değil. Native SQL hızında çalışır, ORM magic yok, her sorgu öngörülebilir. PostGIS fonksiyonları (`ST_Contains`, `ST_DWithin`) tip güvenli helper ile çağrılır. 30M ölçeğinde schema değişikliklerini compile-time'da yakalamak, bir saatlik codegen kurulum maliyetinin çok üstünde değer üretir.
-
----
-
-## 5. Sorgu Routing Matrisi (MVP)
-
-
-| #   | Sorgu Tipi                                      | Hedef Sistem                                                         | Veri Erişim Katmanı                                     | Notlar                                                     |
-| --- | ----------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------- | ---------------------------------------------------------- |
-| 1   | Entity detay (id ile)                           | PostgreSQL                                                           | **jOOQ** `dsl.selectFrom(INTEL).where(INTEL.ID.eq(id))` | PK lookup                                                  |
-| 2   | Template-scoped liste                           | PostgreSQL                                                           | **jOOQ** + `fetchSize(1000)` + `fetchStreamInto`        | `WHERE template = ?`, streaming cursor                     |
-| 3   | Template-scoped filtered                        | PostgreSQL                                                           | **jOOQ** dinamik `condition.and(...)`                   | Null-safe dinamik WHERE                                    |
-| 4   | Polygon içinde (`ST_Contains`)                  | PostgreSQL + PostGIS                                                 | **jOOQ** + `PostGIS.stContains(...)` helper             | GiST index, tip güvenli PostGIS                            |
-| 5   | Distance (`ST_DWithin`)                         | PostgreSQL + PostGIS                                                 | **jOOQ** + `PostGIS.stDWithin(...)` helper              | GiST index, tip güvenli PostGIS                            |
-| 6   | Türkçe full-text (template scoped)              | Solr                                                                 | SolrJ                                                   | BM25, Zemberek                                             |
-| 7   | Cross-template full-text                        | Solr                                                                 | SolrJ                                                   | Tüm collection                                             |
-| 8   | Faceted search                                  | Solr                                                                 | SolrJ                                                   | Native faceting                                            |
-| 9   | Fuzzy search (yazım hatası)                     | Solr                                                                 | SolrJ                                                   | Edit distance                                              |
-| 10  | Delta sync (incremental, `lastQueryTime`)       | PostgreSQL                                                           | **jOOQ** `fetchSize(1000).fetchStreamInto`              | `lastModified > ?`, deleted dahil, streaming               |
-| 11  | Entity CRUD (create/update/delete)              | PostgreSQL (+ outbox)                                                | **jOOQ** `insertInto`/`update`/`update...set(deleted)`  | ACID, `@Transactional`, version field                      |
-| 12  | Export (CSV)                                    | PostgreSQL                                                           | **jOOQ** streaming cursor                               | Server-side cursor, bellek sabit                           |
-| 13  | Outbox worker sync                              | PostgreSQL → Solr                                                    | **jOOQ** `dsl.batch(...)` + SolrJ                       | Batch, öngörülebilir                                       |
-| 14  | **Combined Search** (geo + text + dynamic attr) | **Solr** + **PostGIS** paralel → backend id kesişimi → PG enrichment | SolrJ + jOOQ + CompletableFuture                        | Haritadan poligon + free text + attribute filter aynı anda |
-
-
----
-
-## 6. Veri Akış Özeti
-
-### 6.1 Write Flow
-
-```
-Browser (form submit: templateId + header + desc + attributes{name:value})
-  -> Spring Controller
-  -> IntelligenceService (@Transactional)
-      -> PostgreSQL INSERT/UPDATE intelligence (attributes JSONB olarak)
-      -> Outbox Table INSERT (intelligence_id, operation: INSERT|UPDATE|DELETE)
-      -> [Commit]
-  -> 202 Accepted to client
-
-[Async]
-Outbox Worker (@Scheduled, 1s)
-  -> Outbox unprocessed kayıtları oku (batch)
-  -> Her kayıt için:
-      -> PG'den Intelligence kaydını oku (attributes JSONB dahil)
-      -> Attribute type cache'den {name -> type} map'ini al
-      -> JSONB attributes → Solr dynamic fields dönüştür
-         (STRING→_s, TEXT→_t, DATE→_dt, INTEGER→_i, DOUBLE→_d)
-      -> geom centroid → lat/lon (Solr spatial için)
-      -> SolrJ ile add/delete
-  -> Solr commit (batch)
-  -> Outbox processed=true
-```
-
-### 6.2 Delta Sync Read Flow
-
-```
-
-  -> GET /api/intel?templateId=X[&lastQueryTime=Y]
-  -> Spring Controller
-  -> Intel Service
-      -> PostgreSQL SELECT:
-         - Y yoksa: tüm kayıtlar (deleted=false)
-         - Y varsa: lastModified > Y (deleted=true dahil)
-      -> Response: { records: [...], serverTime: "..." }
-```
-
-### 6.3 Combined Search Flow (Geo + Text + Dynamic Attr)
-
-Kullanıcı haritadan poligon çizer, arama kutusuna metin yazar ve dinamik attribute filtresi seçer — hepsi tek request.
-
-```
-Browser (poligon WKT + q="..." + filters={kaynak:"OSINT", tarih>"2024-01-01"})
-  -> POST /api/intel/combined-search
-  -> CombinedSearchService
-      -> CompletableFuture ile PARALEL:
-          |
-          ├─ [Solr] SolrJ sorgusu:
-          |    q = "şüpheli faaliyet"          (full-text, BM25, Türkçe)
-          |    fq = templateId:X
-          |    fq = kaynak_s:OSINT             (dynamic attribute filter)
-          |    fq = tarih_dt:[2024-01-01 TO *] (dynamic attribute filter)
-          |    fl = id, score                  (sadece id + skor dönsün)
-          |    rows = 5000                     (üst sınır)
-          |    → solrIdSet: {id → score}
-          |
-          └─ [PostGIS] jOOQ sorgusu:
-               SELECT id FROM intelligence
-               WHERE template_id = X
-               AND ST_Contains(ST_GeomFromText(?, 4326), geom)
-               → geoIdSet: Set<UUID>
-          |
-      -> id kesişimi: intersect(solrIdSet.keySet(), geoIdSet)
-          → matchedIds: Set<UUID>
-      |
-      -> [PostgreSQL] jOOQ ile tam kayıtlar çek:
-           SELECT * FROM intelligence WHERE id IN (matchedIds)
-           → records: List<IntelligenceDto>
-      |
-      -> Solr score'a göre sırala (matchedIds içindeki solrIdSet score'ları ile)
-      -> Response: { records: [...], total: N }
-  -> Browser: sonuçları göster
-```
-
-**Uç Durum Yönetimi:**
-
-
-| Durum                                | Davranış                                                          |
-| ------------------------------------ | ----------------------------------------------------------------- |
-| Poligon verilmemiş, sadece text+attr | Sadece Solr sorgusu çalışır, geo adım atlanır                     |
-| Text/attr verilmemiş, sadece poligon | Sadece PostGIS sorgusu çalışır (`ST_Contains`), Solr adım atlanır |
-| Solr sonucu 0                        | Kesişim boş, PG'ye hiç gidilmez                                   |
-| Solr sonucu 5000 (üst sınır)         | Uyarı header'ı ekle: `X-Result-Capped: true`                      |
-| Her ikisi de var                     | Paralel çalışır, kesişim                                          |
-
-
----
-
-## 7. Teknoloji Stack ve Kurulum Gereksinimleri
-
-Bu bölüm, MVP'yi sıfırdan ayağa kaldırmak için gerekli tüm teknolojileri, sürümleri ve bağımlılıkları listeler. İmplementasyon sırasında referans olarak kullanılacak.
-
-### 7.1 Backend Stack (Spring Boot)
-
-**Çalışma Ortamı**
-
-
-|     |     | Not |
-| --- | --- | --- |
-|     |     |     |
-|     |     |     |
-|     |     |     |
-
-
-**Spring Boot Starter'ları**
-
-- `spring-boot-starter-web` — REST API (Spring MVC)
-- `spring-boot-starter-jooq` — jOOQ + `DSLContext` bean + Spring transaction entegrasyonu; **JPA/Hibernate kullanılmaz**
-- `spring-boot-starter-validation` — DTO validation (`jakarta.validation`)
-- `spring-boot-starter-actuator` — health/info endpoint'leri
-
-**Veri Erişim Kütüphaneleri**
-
-- `org.postgresql:postgresql` — PostgreSQL JDBC driver
-- `org.jooq:jooq` — jOOQ core (spring-boot-starter-jooq içinde gelir)
-- `org.locationtech.jts:jts-core` — geometry türleri (`Point`, `Polygon`, `Geometry`), WKT/WKB parse/serialize
-- `net.postgis:postgis-jdbc` — PostGIS geometry `Binding` için (jOOQ codegen forced type)
-- `org.apache.solr:solr-solrj` — SolrJ client (Solr 9.x uyumlu sürüm)
-
-**jOOQ Codegen (K-9 kararı)**
-
-jOOQ, PG şemasına bakarak otomatik Java sınıfları üretir. Tek seferlik kurulum:
-
-```xml
-<!-- pom.xml -->
-<plugin>
-  <groupId>org.jooq</groupId>
-  <artifactId>jooq-codegen-maven</artifactId>
-  <configuration>
-    <jdbc>
-      <url>jdbc:postgresql://localhost:5432/intel_db</url>
-      <user>...</user><password>...</password>
-    </jdbc>
-    <generator>
-      <database>
-        <includes>intel|outbox</includes>
-        <forcedTypes>
-          <!-- geometry sütunları -> JTS Geometry + custom Binding -->
-          <forcedType>
-            <userType>org.locationtech.jts.geom.Geometry</userType>
-            <binding>com.intel.db.binding.JtsGeometryBinding</binding>
-            <includeTypes>geometry</includeTypes>
-          </forcedType>
-        </forcedTypes>
-      </database>
-      <target>
-        <packageName>com.intel.db.generated</packageName>
-        <directory>src/generated/java</directory>
-      </target>
-    </generator>
-  </configuration>
-</plugin>
-```
-
-**Veri Erişim Katmanı (jOOQ ile)**
-
-
-| Katman               | jOOQ API                                                                           | Kullanım              |
-| -------------------- | ---------------------------------------------------------------------------------- | --------------------- |
-| CRUD                 | `dsl.insertInto(INTEL).set(...)` / `selectFrom` / `update`                         | `IntelRepository`     |
-| Geo sorguları        | `dsl.selectFrom(INTEL).where(PostGIS.stContains(...))`                             | `GeoQueryRepository`  |
-| Delta sync streaming | `dsl.selectFrom(INTEL).where(...).fetchSize(1000).fetchStreamInto(IntelDto.class)` | `DeltaSyncRepository` |
-| Outbox worker        | `dsl.batch(dsl.insertInto(OUTBOX)...).execute()`                                   | `OutboxWorker`        |
-| Export               | jOOQ cursor + `StreamingResponseBody`                                              | `ExportService`       |
-
-
-**PostGIS Helper (tek seferlik, ~50 satır)**
-
-```java
-public final class PostGIS {
-    public static Condition stContains(Field<Geometry> col, Geometry polygon) {
-        return DSL.condition("ST_Contains(ST_GeomFromEWKT({0}), {1})",
-            DSL.val(wkt(polygon)), col);
-    }
-    public static Condition stDWithin(Field<Geometry> col, double lon, double lat, double meters) {
-        return DSL.condition("ST_DWithin({0}::geography, ST_MakePoint({1},{2})::geography, {3})",
-            col, DSL.val(lon), DSL.val(lat), DSL.val(meters));
-    }
+id: childTemplate1IntelligenceId
+version: 1
+header: "child template 1 intelligence header"
+description: "child template 1 intelligence description"
+createdAt: t1
+lastModified: t1
+keywords: ["kw1", "kw2"]
+attachedFileUniqueIdList: ["fileId1"]
+location: <JTS Geometry>
+relatedLocationList: [<JTS Geometry>]
+templateId: childTemplate1Id
+
+id: childTemplate2IntelligenceId
+version: 1
+header: "child template 2 intelligence header"
+templateId: childTemplate2Id
+... (same shape)
+
+id: mainIntelligenceId
+version: 1
+header: "intelligence header"
+description: "intelligence description"
+createdAt: t1
+lastModified: t1
+keywords: ["kw1", "kw2"]
+attachedFileUniqueIdList: ["fileId1"]
+location: <JTS Geometry>
+relatedLocationList: [<JTS Geometry>]
+templateId: personTemplateId
+relatedIntelligenceIdList: [childTemplate1IntelligenceId, childTemplate2IntelligenceId]
+attributeIdToAttributeValueMap: {
+  "genderAttributeId": "femaleId",
+  "weightAttributeId": 25
 }
 ```
 
-Bu helper bir kere yazılır, sonra tüm geo sorgularda kullanılır — tip güvenli, string concat yok.
+This dataset shows the values held by the **pure Java** domain beans.
 
-**Audit Alanları (jOOQ ile açık, magic yok)**
+#### Postgres mapping
+
+- Primitive fields (`String`, `long`, `boolean`, `Instant`) map to their natural SQL types.
+- Lists of primitive ids map to `TEXT[]` arrays.
+- `Geometry` and `List<Geometry>` map to PostGIS `GEOMETRY(Geometry, 4326)` and `GEOMETRY[]`.
+- `Intelligence.attributeIdToAttributeValueMap` maps to a single JSONB column named **`attribute_values`**.
+
+#### Java memory vs Postgres JSONB vs Solr — single rule
+
+| Layer | Key | Value (when `AttributeType` is enum) | Value (otherwise) |
+|-------|-----|--------------------------------------|-------------------|
+| Java domain (`Map<String,Object>`) | `Attribute.id` | `AttributeTypeValue.id` | raw scalar |
+| Postgres `attribute_values` JSONB | `Attribute.name` | `AttributeTypeValue.value` | raw scalar |
+| Solr dynamic field | `Attribute.name + suffix` | `AttributeTypeValue.value` | raw scalar |
+
+The outbox worker performs the `id -> name` translation when writing JSONB / Solr and is the only place the lookup runs.
+
+#### Solr document mapping
+
+[managed-schema.xml](d:/osint/osint-intelligence-modules/osint-intelligence-solr-server/src/main/resources/conf/managed-schema.xml) already declares static fields under `<!-- Intelligence static fields -->` and dynamic field suffixes under `<!-- Intelligence dynamic fields -->`.
+
+Dynamic field suffix per `AttributeType` (matching the existing schema):
+
+| AttributeType | Solr suffix | Solr field type |
+|---------------|-------------|-----------------|
+| `STRING` | `_s` | string |
+| `ENUM` | `_s` | string (stores `AttributeTypeValue.value`) |
+| `NUMBER` | `_l` | plong |
+| `BOOLEAN` | `_b` | boolean |
+| `DATE` | `_dt` | pdate |
+| `GEOMETRY` | `_srpt` | location_rpt |
+| `ENUM_LIST` | `_ss` | strings (multi-valued) |
+| `DATE_LIST` | `_dts` | pdates |
+| `GEOMETRY_LIST` | `_srpt` | location_rpt (multi-valued) |
+
+#### JSONB query examples (jOOQ)
 
 ```java
-// createdAt, lastModified, createdBy vb. her insert'te açıkça set edilir:
-private Map<Field<?>, Object> auditCreate(String user) {
-    var now = OffsetDateTime.now();
+// Filter by a specific attribute value (name-based, matches JSONB shape):
+dsl.selectFrom(INTELLIGENCE)
+   .where(INTELLIGENCE.TEMPLATE_ID.eq(templateId))
+   .and(DSL.condition("attribute_values ->> {0} = {1}",
+                      DSL.val("gender"), DSL.val("FEMALE")))
+   .fetch();
+// JSONB GIN index keeps this in milliseconds.
+```
+
+#### Outbox worker JSONB -> Solr conversion
+
+For every dirty `Intelligence` row the worker:
+
+1. Reads the row from Postgres (JSONB included).
+2. Uses cached `Attribute` and `AttributeTypeValue` rows to translate `attributeId -> attributeName` and (for enums) `AttributeTypeValue.id -> AttributeTypeValue.value`.
+3. Maps the translated entries to Solr dynamic fields using the suffix table above.
+4. Computes `location` centroid into the Solr `location_rpt` field.
+5. Sends `add`/`delete` via SolrJ; commits in batches.
+
+### 1.5 Technical Constraints
+
+- **ACID**: transactional consistency is required for writes.
+- **Self-hosted**: every component runs on-prem.
+
+---
+
+## 2. Architectural Challenges (MVP)
+
+### 2.1 No single store covers every need
+
+| Need | Solr alone | PostgreSQL alone |
+|------|-----------|------------------|
+| ACID transaction | No | Yes |
+| Complex geo queries | Limited | Yes (PostGIS) |
+| Full-text + faceting | Yes | Adequate but weaker |
+| Audit / compliance | Weak | Yes |
+
+### 2.2 Cross-store consistency
+
+When the same data lives in two stores, a write that succeeds in one and fails in the other creates inconsistency. Resolution: **Transactional Outbox Pattern** — the write commits to Postgres and an `intelligence_outbox` row in the same transaction, an async worker propagates to Solr.
+
+### 2.3 Eventual consistency window
+
+A row written to Postgres becomes visible in Solr only after the outbox worker runs (sub-second under normal load). The client can show its own write immediately (optimistic UI); the backend reconciles in the background.
+
+### 2.4 Combined Search: geo + full-text + dynamic attributes in one request
+
+Users want to combine a polygon drawn on the map, a free-text query and dynamic attribute filters in a single search. These three filters live in different stores: geo -> PostGIS, text + dynamic attr -> Solr. No single store solves it.
+
+**Solution: backend orchestration (parallel queries + id intersection)**
+
+The backend issues both queries in parallel: Solr returns id+score; PostGIS returns id set. The backend intersects the two id sets and hydrates the rows from Postgres. Polygon usually shrinks the PG side dramatically, so the intersection is cheap.
+
+### 2.5 Delta sync and delete detection
+
+The "what changed?" question is answered with `lastModified > lastQueryTime`: the client records the highest `lastModified` it has seen; the next call sends it as `lastQueryTime`. Plain delta does **not** report deletions, so we use **soft delete** — rows are flagged `deleted = true`, `deletedAt`/`deletedBy` are set, and `lastModified` is bumped so the delta sync still surfaces them.
+
+---
+
+## 3. Final Solution: Polyglot Persistence (MVP)
+
+### 3.1 Architecture summary
+
+```
+PostgreSQL + PostGIS  ->  source of truth, geo, CRUD
+Solr 9.x (latest)     ->  Turkish full-text, faceted search
+Spring Boot backend   ->  orchestration, outbox sync
+```
+
+### 3.2 Why each piece
+
+**PostgreSQL + PostGIS — source of truth**
+
+- ACID transaction so entity + geometry + outbox commit atomically.
+- PostGIS is the industry-standard spatial extension (`ST_Contains`, `ST_DWithin`, ...).
+- Disaster recovery: even if Solr is corrupted, a full reindex is always possible.
+
+**Solr 9.x — full-text**
+
+- Strong Turkish analyser (Zemberek integration).
+- BM25 ranking, highlighting, faceting.
+- Already present in the platform; we adopt the latest version.
+
+**Spring Boot backend — thin orchestration**
+
+- Single integration surface; both PG and Solr are reached from here.
+- Outbox worker runs in the same JVM via `@Scheduled`.
+- **jOOQ as the only data access layer** (CRUD, geo, delta sync, outbox — all type-safe DSL; no JPA/Hibernate, see K-7).
+- SolrJ + jOOQ + Spring ecosystem.
+
+### 3.3 Strengths and weaknesses
+
+**PostgreSQL + PostGIS**
+
+- Strong: ACID, PostGIS, backup/PITR.
+- Weak: not at Solr's level for full-text; no native faceted search.
+
+**Apache Solr 9**
+
+- Strong: Lucene inverted index, Turkish analyser, BM25, faceting, scales past 30M.
+- Weak: no ACID, weak complex geo, schema evolution may need a reindex.
+
+**Spring Boot + jOOQ**
+
+- Strong: compile-time type safety, no ORM magic, PG-first, `@Async`/`@Scheduled`, SolrJ.
+- Weak: JVM cold start; one-time jOOQ codegen setup (~1 hour).
+
+---
+
+## 4. Final Decisions (MVP)
+
+### K-1: Source of Truth = PostgreSQL
+
+**All authoritative writes go to PostgreSQL.** ACID and disaster recovery are non-negotiable; if Solr is corrupted we can always reindex from PG.
+
+### K-2: Geo data lives in PostGIS
+
+**Authoritative geometry is in PostGIS; only a centroid (lat/lon) is indexed in Solr.** Simple spatial queries (inside polygon, within distance) go to PostGIS.
+
+### K-3: Synchronisation = Transactional Outbox Pattern
+
+**PG -> Solr sync runs through the `intelligence_outbox` table with eventual consistency.** A write succeeds even when Solr is down; the worker retries Solr. At-least-once delivery is guaranteed; the worker is idempotent.
+
+### K-4: Full-text Search = Solr
+
+**Turkish full-text and faceted search run in Solr.** Zemberek stemming, BM25 ranking — Solr's strong suit.
+
+### K-5: Delete strategy = Soft delete
+
+**Rows are never physically deleted.** `deleted = true`, `deletedAt`, `deletedBy` are set, and `lastModified` is bumped. Delta sync surfaces deleted rows so the client can tombstone them.
+
+### K-6: Delta sync protocol = `lastQueryTime`
+
+**Clients send `templateId` plus an optional `lastQueryTime` on every request.** Without `lastQueryTime` we return a full snapshot (excluding deleted rows). With it we return rows where `lastModified > lastQueryTime`, including soft-deleted ones.
+
+### K-7: Data access layer = jOOQ (one tool, everywhere)
+
+**All PostgreSQL access — CRUD, geo, delta sync, outbox, export — flows through jOOQ `DSLContext`; we do not use JPA/Hibernate.** jOOQ generates Java types from the live PG schema (codegen); a column rename or type change becomes a compile-time error rather than a runtime surprise. PostGIS functions (`ST_Contains`, `ST_DWithin`, ...) are wrapped in a small type-safe helper. At 30M rows the cost of a one-hour codegen setup is paid back many times by catching schema drift early.
+
+---
+
+## 5. Query Routing Matrix (MVP)
+
+| # | Query type | Target system | Data access | Notes |
+|---|-----------|---------------|-------------|-------|
+| 1 | Entity by id | PostgreSQL | jOOQ `dsl.selectFrom(INTELLIGENCE).where(...ID.eq(id))` | PK lookup |
+| 2 | Template-scoped list | PostgreSQL | jOOQ + `fetchSize(1000) + fetchStreamInto` | streaming cursor |
+| 3 | Template-scoped filtered | PostgreSQL | jOOQ dynamic `condition.and(...)` | null-safe WHERE |
+| 4 | Inside polygon (`ST_Contains`) | PG + PostGIS | jOOQ + `PostGIS.stContains(...)` | GiST index |
+| 5 | Distance (`ST_DWithin`) | PG + PostGIS | jOOQ + `PostGIS.stDWithin(...)` | GiST index |
+| 6 | Turkish full-text (template-scoped) | Solr | SolrJ | BM25, Zemberek |
+| 7 | Cross-template full-text | Solr | SolrJ | whole collection |
+| 8 | Faceted search | Solr | SolrJ | native faceting |
+| 9 | Fuzzy search | Solr | SolrJ | edit distance |
+| 10 | Delta sync | PostgreSQL | jOOQ streaming | `lastModified > ?`, soft-deleted included |
+| 11 | Entity CRUD | PG (+ outbox) | jOOQ | ACID, `@Transactional`, `version` |
+| 12 | Export (CSV) | PostgreSQL | jOOQ streaming cursor | constant memory |
+| 13 | Outbox worker sync | PG -> Solr | jOOQ `batch` + SolrJ | batch, predictable |
+| 14 | Combined search (geo + text + dyn-attr) | Solr + PostGIS parallel -> backend intersection -> PG hydrate | SolrJ + jOOQ + `CompletableFuture` | section 6.3 |
+
+---
+
+## 6. Data Flow Summary
+
+### 6.1 Write flow
+
+```
+Browser (templateId + header + description + attributes{name:value})
+  -> Spring controller
+  -> IntelligenceService (@Transactional)
+      -> INSERT/UPDATE intelligence (attribute_values JSONB)
+      -> INSERT intelligence_outbox (entity_id, op: INSERT|UPDATE|DELETE)
+      -> [commit]
+  -> 202 Accepted
+
+[Async]
+OutboxWorker (@Scheduled, 1s)
+  -> read unprocessed outbox rows in batch (FOR UPDATE SKIP LOCKED)
+  -> for each row:
+      -> reload Intelligence row from Postgres (attribute_values JSONB included)
+      -> use cached Attribute / AttributeTypeValue rows to translate
+         id -> name and (for ENUM/ENUM_LIST) value-id -> value
+      -> map translated entries to Solr dynamic fields:
+         STRING/ENUM -> _s, NUMBER -> _l, BOOLEAN -> _b, DATE -> _dt,
+         GEOMETRY -> _srpt, ENUM_LIST -> _ss, DATE_LIST -> _dts,
+         GEOMETRY_LIST -> _srpt
+      -> compute location centroid -> Solr location_rpt
+      -> SolrJ add/delete
+  -> Solr commit (batch)
+  -> mark outbox.processed_at = now()
+```
+
+### 6.2 Delta sync read flow
+
+```
+GET /api/intelligence?templateId=X[&lastQueryTime=Y]
+  -> Spring controller
+  -> IntelligenceService
+      -> jOOQ stream:
+         - if Y absent: rows where deleted = false
+         - if Y present: rows where last_modified > Y (deleted included)
+      -> response { records: [...], serverTime: ISO-8601 }
+```
+
+### 6.3 Combined search flow (geo + text + dyn-attr)
+
+```
+Browser (polygon WKT + q="..." + filters={source:"OSINT", date>"2024-01-01"})
+  -> POST /api/intelligence/combined-search
+  -> CombinedSearchService
+      -> CompletableFuture.allOf(
+          Solr query (q, fq=templateId:X, fq=source_s:OSINT, fq=date_dt:[2024-01-01 TO *],
+                      fl=id,score, rows=5000) -> Map<id, score>,
+          PostGIS query (template_id = X AND ST_Contains(polygon, geom)) -> Set<id>
+         )
+      -> matchedIds = solrIds ∩ geoIds
+      -> hydrate rows from Postgres WHERE id IN (matchedIds)
+      -> sort by Solr score
+      -> response { records: [...], total: N }
+```
+
+#### Edge cases
+
+| Situation | Behaviour |
+|-----------|-----------|
+| Polygon missing, only text/attr | Solr only; geo step skipped |
+| Text/attr missing, only polygon | PostGIS only (`ST_Contains`); Solr step skipped |
+| Solr returns 0 hits | Intersection empty; no PG hydration |
+| Solr returns 5000 hits (cap) | Add response header `X-Result-Capped: true` |
+| Both supplied | Parallel query + intersection |
+
+---
+
+## 7. Technology Stack and Setup Requirements
+
+### 7.1 Backend stack (Spring Boot)
+
+**Working environment**
+
+| Component | Version | Notes |
+|-----------|---------|-------|
+| Java | 21 | osint-tools JDK at `D:\osint\osint-tools\.tools\jdk` |
+| Maven | 3.9.x | osint-tools Maven |
+| Spring Boot | 3.4.5 | matches `osint-auth-backend` |
+| jOOQ | 3.19.x | bundled by `spring-boot-starter-jooq` |
+| SolrJ | 9.10.x | matches Solr server version |
+| PostgreSQL | 16 | Docker image `postgis/postgis:16-3.4` |
+| PostGIS | 3.4 | extension `CREATE EXTENSION postgis` |
+
+**Spring Boot starters**
+
+- `spring-boot-starter-web` — REST API (Spring MVC).
+- `spring-boot-starter-jooq` — `DSLContext` bean + Spring transaction integration; **JPA/Hibernate is not used**.
+- `spring-boot-starter-validation` — DTO validation (`jakarta.validation`).
+- `spring-boot-starter-actuator` — health/info.
+
+**Data access libraries**
+
+- `org.postgresql:postgresql` — PostgreSQL JDBC driver.
+- `org.jooq:jooq` (transitive via starter).
+- `org.locationtech.jts:jts-core` — `Geometry`, `Point`, `Polygon`, WKT/WKB parse.
+- `net.postgis:postgis-jdbc` — PostGIS geometry binding for JDBC.
+- `org.apache.solr:solr-solrj` — SolrJ client (Solr 9.x).
+- `org.flywaydb:flyway-core` — schema migrations.
+
+**Custom code (one-off)**
+
+- `com.osint.intelligence.db.binding.JtsGeometryBinding` — jOOQ `Binding<Geometry, ?>` mapping `geometry` columns to JTS via WKT.
+- `com.osint.intelligence.db.PostGIS` — type-safe wrappers for `ST_Contains`, `ST_DWithin`, `ST_Intersects`, `ST_MakePoint`.
+
+**jOOQ codegen (K-7)**
+
+A Maven profile (`-Pjooq-codegen`) configures `jooq-codegen-maven` to read the live PG schema and generate Java types under `com.osint.intelligence.db.generated`. The profile is opt-in so the build succeeds without a database (default profile uses string-based DSL).
+
+**Audit fields (jOOQ explicit, no magic)**
+
+```java
+private Map<Field<?>, Object> auditCreate(String user, OffsetDateTime now) {
     return Map.of(
-        INTEL.CREATED_AT, now, INTEL.CREATED_BY, user,
-        INTEL.LAST_MODIFIED, now, INTEL.MODIFIED_BY, user, INTEL.VERSION, 0L
+        INTELLIGENCE.CREATED_AT,   now,
+        INTELLIGENCE.CREATED_BY,   user,
+        INTELLIGENCE.LAST_MODIFIED, now,
+        INTELLIGENCE.MODIFIED_BY,  user,
+        INTELLIGENCE.VERSION,      0L
     );
 }
 ```
 
-**Optimistic Locking**
+**Optimistic locking**
 
-`INTEL.VERSION` alanı; update sorgusuna `WHERE INTEL.VERSION.eq(expectedVersion)` eklenir, etkilenen satır 0 ise `OptimisticLockException` fırlatılır. JPA `@Version` magic'i yok, davranış tamamen görünür.
+`INTELLIGENCE.VERSION` is bumped on every update with a `WHERE version = expected` clause; if the affected-row count is zero we throw `OptimisticLockException`.
 
-**JSON ve Serialization**
+**JSON / serialisation**
 
-- `com.fasterxml.jackson.core:jackson-databind` — Spring Boot ile gömülü
-- `com.fasterxml.jackson.datatype:jackson-datatype-jsr310` — `Instant`, `LocalDateTime` desteği
+- `com.fasterxml.jackson.core:jackson-databind` (transitive via Spring Boot).
+- `com.fasterxml.jackson.datatype:jackson-datatype-jsr310` for `Instant` / `OffsetDateTime`.
 
-**Test Kütüphaneleri**
+**Tests**
 
-- `spring-boot-starter-test` (JUnit 5 + Mockito + AssertJ)
-- `org.testcontainers:postgresql` — PostGIS içeren docker image ile integration test
-- `org.testcontainers:solr` — Solr integration test
+- `spring-boot-starter-test` (JUnit 5, Mockito, AssertJ).
+- `org.testcontainers:postgresql` (PostGIS image).
+- `org.testcontainers:solr`.
 
-**Logging**
+**Logging**: Logback via SLF4J (Spring Boot default).
 
-- Logback (Spring Boot default) — SLF4J facade üzerinden
+### 7.2 Database and search systems
 
-### 7.2 Veritabanı ve Arama Sistemleri
+| Component | Version | Notes |
+|-----------|---------|-------|
+| PostgreSQL | 16.x | Docker image `postgis/postgis:16-3.4` (PostGIS bundled) |
+| PostGIS | 3.4.x | extension on Postgres (`CREATE EXTENSION postgis`) |
+| Apache Solr | same version as `osint-intelligence-solr-server` | Docker image `solr:9.x` |
 
+**PostgreSQL extensions**
 
-| Bileşen     | Sürüm                                                                                      | Notlar                                                               |
-| ----------- | ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
-| PostgreSQL  | 16.x                                                                                       | Docker image: `postgis/postgis:16-3.4` (PostGIS dahil)               |
-| PostGIS     | 3.4.x                                                                                      | PostgreSQL'e extension olarak yüklenir (`CREATE EXTENSION postgis;`) |
-| Apache Solr | D:\osint\osint-intelligence-modules\osint-intelligence-solr-server ile aynı solr versiyonu | Docker image: `solr:9.6`                                             |
-|             |                                                                                            |                                                                      |
+- `postgis` — geometry types and functions.
+- `uuid-ossp` — `uuid_generate_v4()`.
 
+**Solr configuration**
 
-**PostgreSQL Extensions**
+- The Solr core is configured by [osint-intelligence-solr-server](d:/osint/osint-intelligence-modules/osint-intelligence-solr-server) — its `conf/` directory and `core.properties` are reused as-is.
 
-- `postgis` — geometry türleri ve fonksiyonlar
-- `uuid-ossp` — UUID üretimi (`uuid_generate_v4()`)
+**Docker services (MVP)**
 
-**Solr Konfigürasyon Gereksinimleri**
+- `postgres` — `postgis/postgis:16-3.4`, port 5432, persistent volume; started ad-hoc (no docker-compose).
+- `solr` — managed by `osint-intelligence-solr-server`; the user keeps it running. The intelligence server **does not** start or configure Solr.
 
-- D:\osint\osint-intelligence-modules\osint-intelligence-solr-server\src\main\resources altındaki conf klasörüdeki ayarlar ve [core.properties](http://core.properties) dosyası kullanılacak
+### 7.3 API endpoint summary (MVP)
 
-**Docker Servisleri (MVP)**
+| Method | Path | Backend | Description |
+|--------|------|---------|-------------|
+| `GET` | `/api/intelligence?templateId=X&lastQueryTime=Y` | PostgreSQL (jOOQ streaming) | delta sync — full snapshot if `Y` absent, otherwise `last_modified > Y` |
+| `GET` | `/api/intelligence/{id}` | PostgreSQL (jOOQ) | by id |
+| `POST` | `/api/intelligence` | PostgreSQL + outbox -> Solr | create |
+| `PUT` | `/api/intelligence/{id}` | PostgreSQL + outbox -> Solr | update |
+| `DELETE` | `/api/intelligence/{id}` | PostgreSQL + outbox -> Solr | soft delete |
+| `GET` | `/api/intelligence/search?q=...&template=...` | Solr (SolrJ) | full-text |
+| `GET` | `/api/intelligence/search/facets?template=...` | Solr | faceted aggregation |
+| `POST` | `/api/intelligence/combined-search` | Solr + PostGIS parallel -> id intersection -> PG | section 6.3 |
+| `POST` | `/api/intelligence/within-polygon` | PG + PostGIS (jOOQ) | `ST_Contains`, body=WKT |
+| `GET` | `/api/intelligence/near?lat=..&lon=..&km=..` | PG + PostGIS (jOOQ) | `ST_DWithin` |
+| `GET` | `/api/templates` | PostgreSQL | list all templates |
+| `GET` | `/api/templates/{id}/attributes` | PostgreSQL | attributes for a template |
+| `GET` | `/actuator/health` | actuator | PG + Solr health |
 
-- `postgres` — `postgis/postgis:16-3.4`, port 5432, volume persist, docker compose olmasın docker da ayaga kalksın
-- `solr` —  D:\osint\osint-intelligence-modules\osint-intelligence-solr-server modülündeki solr docker da ben ayağa kaldırırım.Solr kurulumuya alakalı hiç birşey yapma
+### 7.4 PostgreSQL index strategy
 
-### 7.6 API Endpoint Özeti (MVP)
+jOOQ is a thin layer; query performance comes from PG indexes. Every read filters on `template_id`, plus geo / delta / search hot paths.
 
-
-| Metod    | Path                                      | Backend Hedef                                 | Açıklama                                                       |
-| -------- | ----------------------------------------- | --------------------------------------------- | -------------------------------------------------------------- |
-| `GET`    | `/api/intel?templateId=X&lastQueryTime=Y` | **PostgreSQL** (jOOQ streaming)               | Delta sync — `Y` yoksa full snapshot, varsa `lastModified > Y` |
-| `GET`    | `/api/intel/{id}`                         | **PostgreSQL** (jOOQ)                         | Tekil kayıt detayı, PK lookup                                  |
-| `POST`   | `/api/intel`                              | **PostgreSQL** + outbox → Solr                | Kayıt oluştur; PG'ye yaz, outbox ile Solr'a sync               |
-| `PUT`    | `/api/intel/{id}`                         | **PostgreSQL** + outbox → Solr                | Kayıt güncelle; aynı outbox akışı                              |
-| `DELETE` | `/api/intel/{id}`                         | **PostgreSQL** + outbox → Solr                | Soft delete; `deleted=true` + outbox ile Solr'dan da kaldır    |
-| `GET`    | `/api/intel/search?q=..&template=..`      | **Solr** (SolrJ)                              | Türkçe full-text, BM25, Zemberek analyzer                      |
-| `GET`    | `/api/intel/search/facets?template=..`    | **Solr** (SolrJ)                              | Faceted aggregation (attribute bazlı dağılım)                  |
-| `POST`   | `/api/intel/combined-search`              | **Solr + PostGIS** paralel → id kesişimi → PG | Geo + text + dynamic attr tek sorguda (bkz. Bölüm 6.3)         |
-| `POST`   | `/api/intel/within-polygon`               | **PostgreSQL + PostGIS** (jOOQ)               | `ST_Contains` — sadece geo, text yok                           |
-| `GET`    | `/api/intel/near?lat=..&lon=..&km=..`     | **PostgreSQL + PostGIS** (jOOQ)               | `ST_DWithin` — mesafe bazlı arama                              |
-| `GET`    | `/api/templates`                          | **PostgreSQL** (jOOQ)                         | Tüm template listesi                                           |
-| `GET`    | `/api/templates/{id}/attributes`          | **PostgreSQL** (jOOQ)                         | Template'e ait attribute tanımları                             |
-| `GET`    | `/actuator/health`                        | Spring Actuator                               | PG + Solr bağlantı sağlık kontrolü                             |
-
-
-### 7.8 PostgreSQL Index Stratejisi
-
-jOOQ ince bir katman olduğu için gerçek sorgu performansı doğrudan PG index kalitesine bağlıdır. Her sorgu `templateId` ile geldiği için ve geo/delta/arama hot path'leri bellidir — index'ler buna göre şekillendirilir.
-
-Her index için **neden** önemli olduğu açıklanmıştır; migration script'ine doğrudan kopyalanabilir.
-
-#### `intel` tablosu index'leri
+#### `intelligence` table indexes
 
 ```sql
--- 1. GiST: geo sorgularının kalbi (ST_Contains, ST_DWithin, ST_Intersects)
---    Bu olmadan spatial sorgu full table scan yapar — 30M'de kabul edilemez.
-CREATE INDEX idx_intel_geom
-    ON intel USING GIST (geom);
+-- 1. GiST: heart of every geo query (ST_Contains, ST_DWithin, ST_Intersects).
+--    Without it spatial queries do a full table scan — unacceptable at 30M.
+CREATE INDEX idx_intelligence_geom
+    ON intelligence USING GIST (location);
 
--- 2. Template + GiST bileşik: template-scoped geo sorguları için
---    "Bu şablondaki kayıtlar içinde şu poligonda olanlar" → tek index ile çözülür.
-CREATE INDEX idx_intel_template_geom
-    ON intel USING GIST (template, geom);
+-- 2. Composite GiST: template + geom for template-scoped geo queries.
+CREATE INDEX idx_intelligence_template_geom
+    ON intelligence USING GIST (template_id, location);
 
--- 3. BRIN: delta sync'in kalbi (lastModified > ?)
---    BRIN, insert-ordered verilerde B-tree'den çok daha küçük ve hızlı.
---    intel tablosu append-dominant (yazılan kayıtlar sıralı büyür) → BRIN ideal.
-CREATE INDEX idx_intel_last_modified_brin
-    ON intel USING BRIN (last_modified) WITH (pages_per_range = 128);
+-- 3. BRIN: heart of delta sync (last_modified > ?).
+--    Append-dominant table -> BRIN is much smaller than B-tree, plenty fast.
+CREATE INDEX idx_intelligence_last_modified_brin
+    ON intelligence USING BRIN (last_modified) WITH (pages_per_range = 128);
 
--- 4. Template + lastModified: delta sync'te template filter + zaman filtresi birlikte
-CREATE INDEX idx_intel_template_last_modified
-    ON intel (template, last_modified);
+-- 4. (template_id, last_modified): delta sync + template filter combined.
+CREATE INDEX idx_intelligence_template_last_modified
+    ON intelligence (template_id, last_modified);
 
--- 5. Partial index: aktif kayıtlar üzerindeki sorgular için (deleted = false)
---    Çoğu okuma sorgusu aktif kayıtlar üzerinde — partial index çok daha küçük ve hızlı.
-CREATE INDEX idx_intel_active
-    ON intel (template, last_modified)
+-- 5. Partial index over active rows (deleted = false).
+CREATE INDEX idx_intelligence_active
+    ON intelligence (template_id, last_modified)
     WHERE deleted = false;
 
--- 6. Classification üzerinde (ileride yetki filtresi eklendiğinde hazır olsun)
-CREATE INDEX idx_intel_classification
-    ON intel (classification)
-    WHERE deleted = false;
-
--- 7. JSONB attributes GIN: dinamik attribute sorgular için
---    attributes->>'kaynak' = 'OSINT' gibi sorgularda GIN devreye girer.
---    Template-specific alan filtrelerinin tümü bu index'ten yararlanır.
-CREATE INDEX idx_intelligence_attributes_gin
-    ON intelligence USING GIN (attributes);
+-- 6. JSONB GIN: dynamic attribute filters such as
+--    `attribute_values ->> 'gender' = 'FEMALE'`.
+CREATE INDEX idx_intelligence_attribute_values_gin
+    ON intelligence USING GIN (attribute_values);
 ```
 
-#### `outbox` tablosu index'leri
+#### `intelligence_outbox` table indexes
 
 ```sql
--- 8. Partial index: worker sadece işlenmemiş kayıtları okur
---    processed = true olan kayıtlar index'e girmez → index küçük ve hızlı kalır.
-CREATE INDEX idx_outbox_unprocessed
-    ON outbox (created_at)
-    WHERE processed = false;
+-- 7. Partial index on unprocessed rows: workers only scan pending work.
+CREATE INDEX idx_intelligence_outbox_unprocessed
+    ON intelligence_outbox (created_at)
+    WHERE processed_at IS NULL;
 ```
 
-#### Index Seçim Gerekçeleri
+#### Index selection rationale
 
+| Index | Type | Reason |
+|-------|------|--------|
+| `location` | GiST | required by `ST_Contains` / `ST_DWithin` |
+| `(template_id, location)` | GiST composite | template-scoped geo in one index |
+| `last_modified` | BRIN | delta sync on append-dominant table |
+| `(template_id, last_modified)` | B-tree | delta sync + template filter |
+| `(template_id, last_modified) WHERE deleted = false` | partial B-tree | active reads, half the size |
+| `attribute_values` | GIN | dynamic JSONB filters |
+| `intelligence_outbox.created_at WHERE processed_at IS NULL` | partial B-tree | worker-only reads |
 
-| Index                                           | Tür            | Gerekçe                                                               |
-| ----------------------------------------------- | -------------- | --------------------------------------------------------------------- |
-| `geom`                                          | GiST           | ST_Contains/ST_DWithin için zorunlu; olmadan full scan                |
-| `(template, geom)`                              | GiST bileşik   | Template-scoped geo sorguları tek index ile                           |
-| `last_modified`                                 | BRIN           | Delta sync; append-dominant tabloda B-tree'den küçük, yeterince hızlı |
-| `(template, last_modified)`                     | B-tree         | Delta sync + template filter birlikte                                 |
-| `(template, last_modified) WHERE deleted=false` | Partial B-tree | Aktif kayıt sorgularında index boyutu yarıya düşer                    |
-| `attributes`                                    | GIN            | JSONB içinde dinamik attribute filtresi (`attributes->>'kaynak' = ?`) |
-| `outbox.created_at WHERE processed=false`       | Partial B-tree | Worker sadece bekleyen işleri okur; index küçük kalır                 |
-
-
-#### PG Parametre Önerileri (dev ortamı için minimum)
+#### PG parameter recommendations (dev minimum)
 
 ```
-# postgresql.conf veya docker-compose environment
-work_mem = 64MB          # Spatial join/sort için; yetersizse disk'e döker
-shared_buffers = 512MB   # Toplam RAM'in ~25%'i (8GB RAM → 2GB ideal)
+work_mem = 64MB
+shared_buffers = 512MB
 effective_cache_size = 2GB
-random_page_cost = 1.1   # SSD varsa (HDD için 4.0)
+random_page_cost = 1.1   # SSD; use 4.0 for HDD
 ```
 
 ---
 
-## 8. İmplementasyon Faz Planı (MVP)
+## 8. Implementation Phase Plan (MVP)
 
-### Faz 0: Hazırlık ve Altyapı
+### Phase 0: Preparation and infrastructure
 
-**Amaç**: Geliştirme ortamı hazır olsun.
+- Docker: PostgreSQL 16 + PostGIS 3.4. Solr 9.x is provided by `osint-intelligence-solr-server` (already exists).
+- Spring Boot 3.4.5 + Java 21 module skeleton at `osint-intelligence-modules/osint-intelligence-server`.
+- CORS open for MVP.
+- Logback default config.
 
-- Docker : PostgreSQL 16 + PostGIS 3.4, Solr 9.10.1 (hali hazırda var, kurma)
-- Spring Boot 3.4.5 + Java 21 proje iskeleti
-- CORS config: tüm origin'lere açık (MVP)
-- Basit logging (Logback)
+### Phase 1: Domain data model + CRUD
 
-### Faz 1: İstihbarat Veri Modeli + CRUD
+- Reuse the four classes from [`osint-intelligence-model`](d:/osint/osint-intelligence-modules/osint-intelligence-model). Add audit + soft-delete fields (`createdAt`, `createdBy`, `lastModified`, `modifiedBy`, `version` (already present), `deleted`, `deletedAt`, `deletedBy`).
+- Flyway migrations: `V1__schema.sql` (tables + PostGIS extension), `V2__indexes.sql` (section 7.4), `V3__outbox.sql` (outbox table).
+- jOOQ codegen Maven profile + `JtsGeometryBinding`. Default profile uses string-based DSL so the build does not require a live DB.
+- DTOs per entity (`IntelligenceDto`, `TemplateDto`, `AttributeDto`, `AttributeTypeValueDto`); the shared mutable beans are not used directly in jOOQ projections.
+- `IntelligenceRepository`, `TemplateRepository`, `AttributeRepository`, `AttributeTypeValueRepository` — each provides CRUD via jOOQ (`insertInto`, `selectFrom`, `update`, soft-delete update).
+- Audit fields are set explicitly on every operation.
+- REST endpoints (`POST /api/intelligence`, `PUT`, `DELETE`, `GET /{id}`, plus equivalents for templates and attributes) with a thin service layer.
+- Unit + integration tests with Testcontainers PostGIS.
 
-**Amaç**: Kayıt oluşturma/okuma/güncelleme/silme çalışsın.
+### Phase 2: Outbox sync + geo queries
 
-- D:\osint\osint-intelligence-modules\osint-intelligence-model altındaki 4 entity için de postgress e crud işlemli yapacak spring boot jooq repository sınıfları yazılsın(jooq de kavramın ismini bilmiyorum)
-- PostGIS `geom` column (SRID 4326)
-- **Tüm index'leri oluştur** (Bölüm 7.8'deki migration script — GiST geo, BRIN delta sync, partial active, GIN metadata, outbox partial)
-- Soft delete alanları (`deleted`, `deletedAt`, `deletedBy`)
-- **jOOQ codegen kurulumu**: Maven plugin + `JtsGeometryBinding` + `mvn compile` ile `INTEL`, `OUTBOX` sınıfları üretilir
-- `Tüm model sınıfları için(4 model için de) DTO yaratılır,IntelligenceDTO vs`  — tüm sorgularda kullanılan projeksiyon (Intelligence class'ı kullanılmaycak)
-- `IntelligenceRepository` — jOOQ `DSLContext` ile CRUD (`insertInto`, `selectFrom`, `update`, soft delete update)
-- `TemplateRepository` — jOOQ `DSLContext` ile CRUD (`insertInto`, `selectFrom`, `update`, soft delete update)
-- `AttributeRepository` — jOOQ `DSLContext` ile CRUD (`insertInto`, `selectFrom`, `update`, soft delete update)
-- `AttributeTypeValueRepository` — jOOQ `DSLContext` ile CRUD (`insertInto`, `selectFrom`, `update`, soft delete update)
-- Audit alanları (`createdAt`, `lastModified`, `version`) her operasyonda açıkça set edilir
-- CRUD REST endpoint'leri ( for example `POST /api/intel`, `PUT /api/intel/{id}`, `DELETE /api/intel/{id}`, `GET /api/intel/{id}`) test edilir
-- Unit + integration test (Testcontainers + gerçek PostGIS)
+- `intelligence_outbox` table + unprocessed partial index.
+- `OutboxWorker` (`@Scheduled`): batch read with `SELECT ... FOR UPDATE SKIP LOCKED`, SolrJ add/delete, retry + backoff.
+- SolrJ client `@Bean`.
+- `PostGIS` helper class (`stContains`, `stDWithin`, `stMakePoint`).
+- `GeoQueryRepository` exposing `withinPolygon(geometry, templateId)` and `near(lat, lon, km, templateId)`.
+- Endpoints: `POST /api/intelligence/within-polygon`, `GET /api/intelligence/near`.
+- Solr full-text endpoint: `GET /api/intelligence/search`.
+- `CombinedSearchService`: `CompletableFuture.allOf` of Solr + PostGIS, intersect, hydrate, sort by score; edge cases per section 6.3.
+- `POST /api/intelligence/combined-search`.
+- Basic outbox-lag metric.
 
-### Faz 2: Outbox Sync + Geo Sorgular (3-4 gün)
+### Phase 3: Delta sync + client cache
 
-**Amaç**: PG → Solr sync çalışsın, basit geo sorgular hazır. Veri erişim: **jOOQ** (K-9).
-
-- `outbox` tablosu + unprocessed partial index
-- `**OutboxWorker`** — `@Scheduled`, jOOQ `dsl.batch(...)` ile toplu outbox okuma + SolrJ ile Solr'a gönderme, retry + backoff
-- SolrJ client config (Spring bean)
-- `**PostGIS` helper sınıfı** — `stContains`, `stDWithin`, `stMakePoint` (tip güvenli, DSL.condition wrapper)
-- `**GeoQueryRepository`** — jOOQ + PostGIS helper ile:
-  - `withinPolygon(Geometry, templateId)` → `dsl.selectFrom(INTEL).where(PostGIS.stContains(...)).fetchInto(IntelDto.class)`
-  - `near(lat, lon, km, templateId)` → `dsl.selectFrom(INTEL).where(PostGIS.stDWithin(...)).fetchInto(IntelDto.class)`
-- PostGIS sorgu endpoint'leri:
-  - `POST /api/intel/within-polygon` (body: WKT polygon)
-  - `GET /api/intel/near?lat=..&lon=..&km=..`
-- Solr full-text arama endpoint'i (`GET /api/intel/search?q=..&template=..`)
-- `**CombinedSearchService`** — `CompletableFuture.allOf` ile Solr + PostGIS paralel sorgu:
-  - Solr: `q` + `fq` (template + dynamic attr filters) → id + score map
-  - PostGIS: `ST_Contains(polygon, geom)` → id set
-  - Backend: id set kesişimi → PG'den tam kayıtlar → score'a göre sıralı response
-  - Uç durum: polygon yoksa sadece Solr; text/attr yoksa sadece PostGIS
-- `POST /api/intel/combined-search` endpoint (bkz. Bölüm 6.3)
-- Monitoring: outbox lag (basit metrik endpoint)
-
-### Faz 3: Delta Sync + Client Cache
-
-**Amaç**: Tek istekle template bazlı delta sync tam çalışsın. Veri erişim: **jOOQ streaming cursor** (K-9, 30M hot path).
-
-- `**DeltaSyncRepository`** — jOOQ:
-  - `dsl.selectFrom(INTEL).where(conditions).orderBy(INTEL.LAST_MODIFIED, INTEL.ID).fetchSize(1000).fetchStreamInto(IntelligenceDto.class)`
-  - `@Transactional(readOnly=true)` + server-side cursor → bellek sabit, tüm result set memory'e alınmaz
-  - Dinamik `conditions`: `lastQueryTime` null ise `deleted=false`, değilse `lastModified > lastQueryTime` (deleted=true dahil)
-- `GET /api/intel?templateId=X&lastQueryTime=Y` endpoint
-  - `Y` yoksa → tam snapshot (deleted=false)
-  - `Y` varsa → `lastModified > Y` (deleted=true dahil)
-  - Response: `{ records: [...], serverTime: ISO-8601 }`
-- Sayfalama: `limit` + cursor (large snapshot için, `row(INTEL.LAST_MODIFIED, INTEL.ID).gt(row(ts, id))` tuple cursor — jOOQ DSL ile tip güvenli)
+- `DeltaSyncRepository`:
+  - `dsl.selectFrom(INTELLIGENCE).where(conditions).orderBy(LAST_MODIFIED, ID).fetchSize(1000).fetchStreamInto(IntelligenceDto.class)`.
+  - `@Transactional(readOnly=true)` + server-side cursor.
+  - dynamic `conditions`: when `lastQueryTime` is null filter by `deleted = false`; otherwise `last_modified > lastQueryTime` (deleted included).
+- `GET /api/intelligence?templateId=X&lastQueryTime=Y` returns `{ records, serverTime }`.
+- Pagination: tuple cursor `row(LAST_MODIFIED, ID).gt(row(ts, id))`.
 
 ---
 
-## 9. Mimari Görsel Özet (MVP)
+## 9. Architecture diagram (MVP)
 
 ```mermaid
 flowchart LR
-    Browser["Browser UI<br/>Fetch Butonu"] -->|"templateId, lastQueryTime"| Spring
+    Browser["Browser UI<br/>delta fetch"] -->|"templateId, lastQueryTime"| Spring
     subgraph Spring [Spring Boot Backend]
-        Controller["REST Controller"]
-        Service["Intel Service<br/>@Transactional"]
-        Outbox["Outbox Worker<br/>@Scheduled"]
+        Controller["REST controller"]
+        Service["Intelligence service<br/>@Transactional"]
+        Outbox["Outbox worker<br/>@Scheduled"]
         Controller --> Service
         Service --> Outbox
     end
-    Spring -->|"SQL + PostGIS"| PG[("PostgreSQL 16<br/>+ PostGIS")]
+    Spring -->|"jOOQ + PostGIS"| PG[("PostgreSQL 16<br/>+ PostGIS")]
     Spring -->|"SolrJ"| Solr[("Apache Solr 9<br/>TR analyzer")]
     Outbox -->|"PG -> Solr sync"| Solr
     Browser --> Dexie[("IndexedDB<br/>via Dexie")]
     Browser --> TanStack["TanStack Query<br/>cache + delta"]
 ```
-
-
-
----
-
----
-

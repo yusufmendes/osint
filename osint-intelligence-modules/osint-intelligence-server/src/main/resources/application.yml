@@ -1,0 +1,47 @@
+spring:
+  application:
+    name: osint-intelligence-server
+  datasource:
+    url: ${INTEL_DB_URL:jdbc:postgresql://localhost:5432/intelligence}
+    username: ${INTEL_DB_USER:intelligence}
+    password: ${INTEL_DB_PASSWORD:intelligence}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 16
+      minimum-idle: 2
+      pool-name: intel-hikari
+  jooq:
+    sql-dialect: POSTGRES
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+server:
+  port: ${INTEL_SERVER_PORT:8081}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+intelligence:
+  solr:
+    base-url: ${INTEL_SOLR_BASE_URL:http://localhost:8983/solr}
+    collection: ${INTEL_SOLR_COLLECTION:intelligence}
+    request-timeout-millis: 10000
+  outbox:
+    poll-millis: 1000
+    batch-size: 100
+    max-attempts: 5
+  combined-search:
+    solr-row-cap: 5000
+
+logging:
+  level:
+    org.jooq: WARN
+    com.osint.intelligence: INFO

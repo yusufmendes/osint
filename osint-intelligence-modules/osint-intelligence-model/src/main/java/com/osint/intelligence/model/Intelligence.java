@@ -2,7 +2,12 @@ package com.osint.intelligence.model;
 
 import org.locationtech.jts.geom.Geometry;
 
-import java.util.*;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Primary intelligence aggregate: narrative fields, spatial footprint, template link,
@@ -11,6 +16,13 @@ import java.util.*;
  * <p><strong>Mutable bean</strong> — intended for incremental updates and cache-backed graphs: change
  * fields with setters and mutate {@link #getAttributeIdToAttributeValueMap()} with {@link Map#put}
  * without copying the whole object. Not thread-safe; guard shared cached instances externally if needed.</p>
+ *
+ * <h2>{@code attributeIdToAttributeValueMap} representation</h2>
+ * <p>In Java memory the map is keyed by {@link Attribute#getId()}; values are
+ * {@link AttributeTypeValue#getId()} for {@link AttributeType#ENUM}/{@link AttributeType#ENUM_LIST} and the raw
+ * scalar otherwise. Postgres JSONB and Solr store the same data keyed by {@link Attribute#getName()} with
+ * value = {@link AttributeTypeValue#getValue()} (for enums) or the raw scalar — the outbox worker performs
+ * the {@code id -> name} translation when writing the storage form.</p>
  */
 public class Intelligence {
 
@@ -18,8 +30,6 @@ public class Intelligence {
     private long version;
     private String header;
     private String description;
-    private Date creationDate;
-    private Date lastModificationDate;
     private final List<String> keywords = new ArrayList<>();
     private final List<String> attachedFileUniqueIdList = new ArrayList<>();
     private Geometry location;
@@ -28,6 +38,14 @@ public class Intelligence {
     private final List<String> relatedIntelligenceIdList = new ArrayList<>();
     private final Map<String, Object> attributeIdToAttributeValueMap = new HashMap<>();
 
+    private Instant createdAt;
+    private String createdBy;
+    private Instant lastModified;
+    private String modifiedBy;
+    private boolean deleted;
+    private Instant deletedAt;
+    private String deletedBy;
+
     public Intelligence() {}
 
     public Intelligence(
@@ -35,8 +53,6 @@ public class Intelligence {
             long version,
             String header,
             String description,
-            Date creationDate,
-            Date lastModificationDate,
             List<String> keywords,
             List<String> attachedFileUniqueIdList,
             Geometry location,
@@ -48,8 +64,6 @@ public class Intelligence {
         this.version = version;
         this.header = header;
         this.description = description;
-        this.creationDate = creationDate;
-        this.lastModificationDate = lastModificationDate;
         setKeywords(keywords);
         setAttachedFileUniqueIdList(attachedFileUniqueIdList);
         this.location = location;
@@ -59,41 +73,19 @@ public class Intelligence {
         setAttributeIdToAttributeValueMap(attributeIdToAttributeValueMap);
     }
 
-    public String getId() {
-        return id;
-    }
+    public String getId() { return id; }
+    public void setId(String id) { this.id = id; }
 
-    public void setId(String id) {
-        this.id = id;
-    }
+    public long getVersion() { return version; }
+    public void setVersion(long version) { this.version = version; }
 
-    public long getVersion() {
-        return version;
-    }
+    public String getHeader() { return header; }
+    public void setHeader(String header) { this.header = header; }
 
-    public void setVersion(long version) {
-        this.version = version;
-    }
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
 
-    public String getHeader() {
-        return header;
-    }
-
-    public void setHeader(String header) {
-        this.header = header;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
-    }
-
-    public List<String> getKeywords() {
-        return keywords;
-    }
+    public List<String> getKeywords() { return keywords; }
 
     public void setKeywords(List<String> list) {
         keywords.clear();
@@ -102,9 +94,7 @@ public class Intelligence {
         }
     }
 
-    public void addKeyword(String keyword) {
-        keywords.add(keyword);
-    }
+    public void addKeyword(String keyword) { keywords.add(keyword); }
 
     public void addAllKeywords(Collection<String> values) {
         if (values != null) {
@@ -112,9 +102,7 @@ public class Intelligence {
         }
     }
 
-    public List<String> getAttachedFileUniqueIdList() {
-        return attachedFileUniqueIdList;
-    }
+    public List<String> getAttachedFileUniqueIdList() { return attachedFileUniqueIdList; }
 
     public void setAttachedFileUniqueIdList(List<String> list) {
         attachedFileUniqueIdList.clear();
@@ -123,17 +111,10 @@ public class Intelligence {
         }
     }
 
-    public Geometry getLocation() {
-        return location;
-    }
+    public Geometry getLocation() { return location; }
+    public void setLocation(Geometry location) { this.location = location; }
 
-    public void setLocation(Geometry location) {
-        this.location = location;
-    }
-
-    public List<Geometry> getRelatedLocationList() {
-        return relatedLocationList;
-    }
+    public List<Geometry> getRelatedLocationList() { return relatedLocationList; }
 
     public void setRelatedLocationList(List<Geometry> list) {
         relatedLocationList.clear();
@@ -142,21 +123,12 @@ public class Intelligence {
         }
     }
 
-    public void addRelatedLocation(Geometry geometry) {
-        relatedLocationList.add(geometry);
-    }
+    public void addRelatedLocation(Geometry geometry) { relatedLocationList.add(geometry); }
 
-    public String getTemplateId() {
-        return templateId;
-    }
+    public String getTemplateId() { return templateId; }
+    public void setTemplateId(String templateId) { this.templateId = templateId; }
 
-    public void setTemplateId(String templateId) {
-        this.templateId = templateId;
-    }
-
-    public List<String> getRelatedIntelligenceIdList() {
-        return relatedIntelligenceIdList;
-    }
+    public List<String> getRelatedIntelligenceIdList() { return relatedIntelligenceIdList; }
 
     public void setRelatedIntelligenceIdList(List<String> list) {
         relatedIntelligenceIdList.clear();
@@ -170,8 +142,7 @@ public class Intelligence {
     }
 
     /**
-     * Live map: use {@link Map#put}, {@link Map#remove}, etc. Keys and values may be {@code null} depending on
-     * your persistence/API rules (this implementation is a plain {@link HashMap}).
+     * Live map keyed by {@link Attribute#getId()} (see class Javadoc for storage-side rules).
      */
     public Map<String, Object> getAttributeIdToAttributeValueMap() {
         return attributeIdToAttributeValueMap;
@@ -184,19 +155,24 @@ public class Intelligence {
         }
     }
 
-    public Date getCreationDate() {
-        return creationDate;
-    }
+    public Instant getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
 
-    public void setCreationDate(Date creationDate) {
-        this.creationDate = creationDate;
-    }
+    public String getCreatedBy() { return createdBy; }
+    public void setCreatedBy(String createdBy) { this.createdBy = createdBy; }
 
-    public Date getLastModificationDate() {
-        return lastModificationDate;
-    }
+    public Instant getLastModified() { return lastModified; }
+    public void setLastModified(Instant lastModified) { this.lastModified = lastModified; }
 
-    public void setLastModificationDate(Date lastModificationDate) {
-        this.lastModificationDate = lastModificationDate;
-    }
+    public String getModifiedBy() { return modifiedBy; }
+    public void setModifiedBy(String modifiedBy) { this.modifiedBy = modifiedBy; }
+
+    public boolean isDeleted() { return deleted; }
+    public void setDeleted(boolean deleted) { this.deleted = deleted; }
+
+    public Instant getDeletedAt() { return deletedAt; }
+    public void setDeletedAt(Instant deletedAt) { this.deletedAt = deletedAt; }
+
+    public String getDeletedBy() { return deletedBy; }
+    public void setDeletedBy(String deletedBy) { this.deletedBy = deletedBy; }
 }
