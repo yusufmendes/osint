@@ -2,6 +2,7 @@ package com.osint.intelligence.server.repository;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.osint.intelligence.server.db.GeometryWkt;
+import com.osint.intelligence.server.db.JdbcTimes;
 import com.osint.intelligence.server.db.JsonbSupport;
 import com.osint.intelligence.server.dto.AuditDto;
 import com.osint.intelligence.server.dto.IntelligenceDto;
@@ -226,12 +227,12 @@ public class IntelligenceRepository {
         String[] attached = record.get(INTELLIGENCE_ATTACHED_FILES);
         String[] related = record.get(INTELLIGENCE_RELATED_IDS);
         AuditDto audit = new AuditDto(
-                record.get(INTELLIGENCE_CREATED_AT),
+                JdbcTimes.getInstant(record, INTELLIGENCE_CREATED_AT),
                 record.get(INTELLIGENCE_CREATED_BY),
-                record.get(INTELLIGENCE_LAST_MODIFIED),
+                JdbcTimes.getInstant(record, INTELLIGENCE_LAST_MODIFIED),
                 record.get(INTELLIGENCE_MODIFIED_BY),
                 Boolean.TRUE.equals(record.get(INTELLIGENCE_DELETED)),
-                record.get(INTELLIGENCE_DELETED_AT),
+                JdbcTimes.getInstant(record, INTELLIGENCE_DELETED_AT),
                 record.get(INTELLIGENCE_DELETED_BY));
         return new IntelligenceDto(
                 record.get(INTELLIGENCE_ID),

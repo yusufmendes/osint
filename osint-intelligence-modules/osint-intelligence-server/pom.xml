@@ -27,6 +27,13 @@
         <postgis-jdbc.version>2024.1.0</postgis-jdbc.version>
         <solr.version>9.10.1</solr.version>
         <testcontainers.version>1.20.4</testcontainers.version>
+        <!--
+          Pin Jetty back to 10.x to match what solr-solrj 9.10.1 was built against.
+          Spring Boot 3.4.5's BOM ships Jetty 12, which moves Http2SolrClient's
+          InputStreamResponseListener out of org.eclipse.jetty.client.util and
+          breaks SolrClient at runtime with NoClassDefFoundError.
+        -->
+        <jetty.version>10.0.26</jetty.version>
     </properties>
 
     <dependencyManagement>
@@ -44,6 +51,42 @@
                 <version>${testcontainers.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+            <!--
+              Force the Jetty client/util/io stack down to 10.x so it is binary-compatible with
+              http2-client 10.0.26 that solr-solrj 9.10.1 depends on. Spring Boot 3.4.5's BOM
+              hard-pins these to 12.0.19, where InputStreamResponseListener was relocated and
+              Http2SolrClient blows up at bean instantiation with NoClassDefFoundError.
+            -->
+            <dependency>
+                <groupId>org.eclipse.jetty</groupId>
+                <artifactId>jetty-client</artifactId>
+                <version>${jetty.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.eclipse.jetty</groupId>
+                <artifactId>jetty-http</artifactId>
+                <version>${jetty.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.eclipse.jetty</groupId>
+                <artifactId>jetty-util</artifactId>
+                <version>${jetty.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.eclipse.jetty</groupId>
+                <artifactId>jetty-io</artifactId>
+                <version>${jetty.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.eclipse.jetty</groupId>
+                <artifactId>jetty-alpn-client</artifactId>
+                <version>${jetty.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.eclipse.jetty</groupId>
+                <artifactId>jetty-alpn-java-client</artifactId>
+                <version>${jetty.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -117,6 +160,18 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <!--
+          Spring Boot 3.4's ClientHttpRequestFactoryBuilder.detect() picks Jetty when
+          jetty-client is on the classpath (which it is, via solr-solrj's HTTP/2 client).
+          Because we pinned Jetty back to 10 for Solr compatibility, the Jetty 12-only
+          HttpClientTransportOverHTTP class is absent and TestRestTemplate fails to build.
+          Adding Apache HttpClient 5 makes detect() pick Apache first and bypass Jetty.
+        -->
+        <dependency>
+            <groupId>org.apache.httpcomponents.client5</groupId>
+            <artifactId>httpclient5</artifactId>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>postgresql</artifactId>
@@ -125,6 +180,24 @@
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- E2E HTTP client -->
+        <dependency>
+            <groupId>io.rest-assured</groupId>
+            <artifactId>rest-assured</artifactId>
+            <version>5.5.0</version>
+            <scope>test</scope>
+        </dependency>
+        <!-- Wait for async outbox -> Solr propagation -->
+        <dependency>
+            <groupId>org.awaitility</groupId>
+            <artifactId>awaitility</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -138,6 +211,14 @@
                 <version>${spring-boot.version}</version>
                 <configuration>
                     <mainClass>com.osint.intelligence.server.IntelligenceServerApplication</mainClass>
+                    <!--
+                      Emit the executable boot jar with a classifier so the thin jar
+                      (target/osint-intelligence-server.jar) stays the main artifact and
+                      the production classes remain visible to Failsafe in the
+                      integration-test phase. Run the app with:
+                        java -jar target/osint-intelligence-server-boot.jar
+                    -->
+                    <classifier>boot</classifier>
                 </configuration>
                 <executions>
                     <execution>
@@ -152,7 +233,111 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
                     <release>${java.version}</release>
+                    <!--
+                      Spring MVC needs parameter names at runtime to bind @RequestParam / @PathVariable
+                      arguments that don't explicitly declare a name (e.g. {@code @RequestParam String q}).
+                      Without -parameters, Spring throws IllegalArgumentException at request time.
+                    -->
+                    <parameters>true</parameters>
                 </configuration>
+            </plugin>
+
+            <!--
+              Copy the sibling Solr configset (osint-intelligence-solr-server) into
+              target/test-solr-conf so the Testcontainers Solr container can mount it.
+              Runs in process-test-resources to be ready before failsafe IT phase.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>copy-solr-conf-for-it</id>
+                        <phase>process-test-resources</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${project.build.directory}/test-solr-conf</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>${project.basedir}/../osint-intelligence-solr-server/src/main/resources/conf</directory>
+                                    <filtering>false</filtering>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!--
+              Surefire: run unit tests (*Test.java); skip *IT.java which is failsafe territory.
+              The argLine flag works around the "Boot Manifest-JAR contains absolute paths in
+              classpath" failure that surfaces on Windows when the project root and the local
+              Maven repository live on different drives (e.g. project on D:\ and ~/.m2 on C:\).
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <argLine>-Djdk.net.URLClassPath.disableClassPathURLCheck=true</argLine>
+                    <excludes>
+                        <exclude>**/*IT.java</exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+
+            <!--
+              Failsafe: drives E2E integration tests (*IT.java) in the integration-test phase.
+              Tests in src/test/java/com/osint/intelligence/server/e2e bring up Postgres+PostGIS
+              and Solr via Testcontainers, boot the Spring Boot application on a random local port,
+              hit the REST endpoints, and tear everything down at JVM exit.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <configuration>
+                    <argLine>-Djdk.net.URLClassPath.disableClassPathURLCheck=true</argLine>
+                    <includes>
+                        <include>**/*IT.java</include>
+                    </includes>
+                    <systemPropertyVariables>
+                        <solr.conf.dir>${project.build.directory}/test-solr-conf</solr.conf.dir>
+                        <!--
+                          Testcontainers reads docker.host (lowercase system property) as a
+                          fallback after DOCKER_HOST. Forwarding both makes the Docker endpoint
+                          reach the forked test JVM regardless of whether the parent passes its
+                          environment.
+                        -->
+                        <docker.host>${env.DOCKER_HOST}</docker.host>
+                        <!--
+                          Bump the docker-java client API version. Without this, docker-java sends
+                          X-Docker-Api-Version: 1.32 which modern Engines reject (they require
+                          >= 1.40). 1.43 is supported by Docker Engine 20.10+.
+                        -->
+                        <api.version>1.43</api.version>
+                    </systemPropertyVariables>
+                    <environmentVariables>
+                        <DOCKER_HOST>${env.DOCKER_HOST}</DOCKER_HOST>
+                        <DOCKER_TLS_VERIFY>${env.DOCKER_TLS_VERIFY}</DOCKER_TLS_VERIFY>
+                        <DOCKER_CERT_PATH>${env.DOCKER_CERT_PATH}</DOCKER_CERT_PATH>
+                        <!--
+                          The docker-java client used by Testcontainers defaults to a low API
+                          version that newer Docker Engines reject ("client version 1.32 is too
+                          old"). Pin a modern API version supported by Engine >= 19.03.
+                        -->
+                        <DOCKER_API_VERSION>1.43</DOCKER_API_VERSION>
+                    </environmentVariables>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>integration-tests</id>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

@@ -9,7 +9,9 @@ import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.Point;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
@@ -32,8 +34,11 @@ public class SolrIndexer {
         doc.setField("templateId", dto.templateId());
         doc.setField("header", dto.header());
         doc.setField("description", dto.description());
-        doc.setField("creationDate", dto.audit().createdAt());
-        doc.setField("lastModificationDate", dto.audit().lastModified());
+        // SolrJ's javabin codec doesn't understand java.time.Instant — passing one through ends up
+        // serialised as the toString() form ("java.time.Instant:..."), which Solr then fails to parse
+        // as a date. Hand it a java.util.Date so the codec routes it through the date binder.
+        doc.setField("creationDate", toDate(dto.audit().createdAt()));
+        doc.setField("lastModificationDate", toDate(dto.audit().lastModified()));
         doc.setField("keywords", dto.keywords());
         doc.setField("attachedFileUniqueIdList", dto.attachedFileUniqueIdList());
         doc.setField("relatedIntelligenceIdList", dto.relatedIntelligenceIdList());
@@ -117,6 +122,10 @@ public class SolrIndexer {
             return result;
         }
         return List.of();
+    }
+
+    private static Date toDate(Instant instant) {
+        return instant == null ? null : Date.from(instant);
     }
 
     /**

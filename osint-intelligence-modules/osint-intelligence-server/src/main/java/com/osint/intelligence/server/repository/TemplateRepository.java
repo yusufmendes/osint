@@ -1,5 +1,6 @@
 package com.osint.intelligence.server.repository;
 
+import com.osint.intelligence.server.db.JdbcTimes;
 import com.osint.intelligence.server.dto.AuditDto;
 import com.osint.intelligence.server.dto.TemplateDto;
 import com.osint.intelligence.server.error.OptimisticLockException;
@@ -102,12 +103,12 @@ public class TemplateRepository {
         String[] children = record.get(TEMPLATE_CHILD_IDS);
         String[] attrs = record.get(TEMPLATE_ATTRIBUTE_IDS);
         AuditDto audit = new AuditDto(
-                record.get(TEMPLATE_CREATED_AT),
+                JdbcTimes.getInstant(record, TEMPLATE_CREATED_AT),
                 record.get(TEMPLATE_CREATED_BY),
-                record.get(TEMPLATE_LAST_MODIFIED),
+                JdbcTimes.getInstant(record, TEMPLATE_LAST_MODIFIED),
                 record.get(TEMPLATE_MODIFIED_BY),
                 Boolean.TRUE.equals(record.get(TEMPLATE_DELETED)),
-                record.get(TEMPLATE_DELETED_AT),
+                JdbcTimes.getInstant(record, TEMPLATE_DELETED_AT),
                 record.get(TEMPLATE_DELETED_BY));
         return new TemplateDto(
                 record.get(TEMPLATE_ID),

@@ -2,6 +2,9 @@
 
 CREATE EXTENSION IF NOT EXISTS postgis;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+-- btree_gist is required by V2's composite GiST index on (template_id, location);
+-- without it Postgres rejects "data type text has no default operator class for access method gist".
+CREATE EXTENSION IF NOT EXISTS btree_gist;
 
 -- attribute_type_value -----------------------------------------------------------------
 CREATE TABLE attribute_type_value (

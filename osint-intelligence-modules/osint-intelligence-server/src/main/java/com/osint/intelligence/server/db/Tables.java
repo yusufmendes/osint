@@ -1,12 +1,17 @@
 package com.osint.intelligence.server.db;
 
+import org.jooq.Converter;
+import org.jooq.DataType;
 import org.jooq.Field;
 import org.jooq.Name;
 import org.jooq.Table;
 import org.jooq.impl.DSL;
+import org.jooq.impl.SQLDataType;
 import org.locationtech.jts.geom.Geometry;
 
 import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 
 /**
  * Hand-written jOOQ table/field references for the intelligence schema.
@@ -30,7 +35,15 @@ public final class Tables {
     public static final Field<String> INTELLIGENCE_DESCRIPTION = field(INTELLIGENCE, "description", String.class);
     public static final Field<String[]> INTELLIGENCE_KEYWORDS = field(INTELLIGENCE, "keywords", String[].class);
     public static final Field<String[]> INTELLIGENCE_ATTACHED_FILES = field(INTELLIGENCE, "attached_file_unique_ids", String[].class);
-    public static final Field<Geometry> INTELLIGENCE_LOCATION = DSL.field(DSL.name("intelligence", "location"), Geometry.class);
+    /**
+     * PostGIS {@code geometry} column type, mapped via {@link JtsGeometryBinding}. The hand-written
+     * Tables class skips jOOQ codegen, so we need to attach the binding manually instead of relying
+     * on a {@code <forcedType>} entry in the codegen profile.
+     */
+    public static final DataType<Geometry> GEOMETRY_TYPE =
+            SQLDataType.OTHER.asConvertedDataType(new JtsGeometryBinding());
+
+    public static final Field<Geometry> INTELLIGENCE_LOCATION = DSL.field(DSL.name("intelligence", "location"), GEOMETRY_TYPE);
     public static final Field<String> INTELLIGENCE_TEMPLATE_ID = field(INTELLIGENCE, "template_id", String.class);
     public static final Field<String[]> INTELLIGENCE_RELATED_IDS = field(INTELLIGENCE, "related_intelligence_ids", String[].class);
     public static final Field<String> INTELLIGENCE_ATTRIBUTE_VALUES = field(INTELLIGENCE, "attribute_values", String.class); // JSONB read as string
@@ -101,8 +114,44 @@ public final class Tables {
     public static final Field<Integer> OUTBOX_ATTEMPT_COUNT = field(OUTBOX, "attempt_count", Integer.class);
     public static final Field<String> OUTBOX_LAST_ERROR = field(OUTBOX, "last_error", String.class);
 
+    /**
+     * Holder for the {@code timestamptz}/{@link Instant} {@link DataType}. Wrapped in a nested class
+     * so the constant is only resolved when {@link #field(Table, String, Class)} is invoked, instead
+     * of during {@code Tables.<clinit>} where it would not yet be assigned (Java initializes static
+     * fields top-to-bottom and the field accessors above this declaration call {@code field(...)}).
+     */
+    private static final class InstantTypeHolder {
+        static final DataType<Instant> INSTANT_TZ = SQLDataType.TIMESTAMPWITHTIMEZONE
+                .asConvertedDataType(new Converter<>() {
+                    @Override
+                    public Instant from(OffsetDateTime value) {
+                        return value == null ? null : value.toInstant();
+                    }
+
+                    @Override
+                    public OffsetDateTime to(Instant value) {
+                        return value == null ? null : value.atOffset(ZoneOffset.UTC);
+                    }
+
+                    @Override
+                    public Class<OffsetDateTime> fromType() {
+                        return OffsetDateTime.class;
+                    }
+
+                    @Override
+                    public Class<Instant> toType() {
+                        return Instant.class;
+                    }
+                });
+    }
+
     private static <T> Field<T> field(Table<?> table, String column, Class<T> type) {
         Name name = DSL.name(table.getUnqualifiedName().last(), column);
+        if (type == Instant.class) {
+            @SuppressWarnings("unchecked")
+            Field<T> casted = (Field<T>) DSL.field(name, InstantTypeHolder.INSTANT_TZ);
+            return casted;
+        }
         return DSL.field(name, type);
     }
 }

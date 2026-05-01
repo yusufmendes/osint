@@ -12,6 +12,8 @@ import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.common.SolrInputDocument;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,23 +33,33 @@ public class OutboxWorker {
     private final SolrIndexer solrIndexer;
     private final IntelligenceProperties properties;
 
+    /**
+     * Self-reference resolved to the Spring-managed proxy. Required because the {@link Scheduled}
+     * {@link #poll()} method calls {@link #processBatch()} which is {@link Transactional}; a direct
+     * {@code this.processBatch()} call would bypass the CGLIB proxy and skip transaction setup, making
+     * the {@code MANDATORY} repositories blow up.
+     */
+    private final OutboxWorker self;
+
     public OutboxWorker(
             OutboxRepository outboxRepository,
             IntelligenceRepository intelligenceRepository,
             SolrClient solrClient,
             SolrIndexer solrIndexer,
-            IntelligenceProperties properties) {
+            IntelligenceProperties properties,
+            @Autowired @Lazy OutboxWorker self) {
         this.outboxRepository = outboxRepository;
         this.intelligenceRepository = intelligenceRepository;
         this.solrClient = solrClient;
         this.solrIndexer = solrIndexer;
         this.properties = properties;
+        this.self = self;
     }
 
     @Scheduled(fixedDelayString = "${intelligence.outbox.poll-millis:1000}")
     public void poll() {
         try {
-            int processed = processBatch();
+            int processed = self.processBatch();
             if (processed > 0) {
                 log.info("OutboxWorker processed {} entries", processed);
             }

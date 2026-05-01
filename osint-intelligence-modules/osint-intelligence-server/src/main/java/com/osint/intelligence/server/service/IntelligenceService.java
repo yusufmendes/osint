@@ -53,7 +53,12 @@ public class IntelligenceService {
 
     @Transactional(readOnly = true)
     public IntelligenceDto requireById(String id) {
-        return findById(id).orElseThrow(() -> new EntityNotFoundException("Intelligence", id));
+        IntelligenceDto dto = findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Intelligence", id));
+        if (dto.audit().deleted()) {
+            throw new EntityNotFoundException("Intelligence", id);
+        }
+        return dto;
     }
 
     @Transactional(readOnly = true)

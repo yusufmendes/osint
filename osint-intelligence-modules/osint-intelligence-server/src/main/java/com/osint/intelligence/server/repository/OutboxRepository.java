@@ -1,5 +1,6 @@
 package com.osint.intelligence.server.repository;
 
+import com.osint.intelligence.server.db.JdbcTimes;
 import com.osint.intelligence.server.dto.OutboxEntityType;
 import com.osint.intelligence.server.dto.OutboxEntry;
 import com.osint.intelligence.server.dto.OutboxOp;
@@ -82,14 +83,14 @@ public class OutboxRepository {
     }
 
     private OutboxEntry map(Record record) {
-        Instant processedAt = record.get(OUTBOX_PROCESSED_AT);
+        Instant processedAt = JdbcTimes.getInstant(record, OUTBOX_PROCESSED_AT);
         Integer attempts = record.get(OUTBOX_ATTEMPT_COUNT);
         return new OutboxEntry(
                 record.get(OUTBOX_ID),
                 OutboxEntityType.valueOf(record.get(OUTBOX_ENTITY_TYPE)),
                 record.get(OUTBOX_ENTITY_ID),
                 OutboxOp.valueOf(record.get(OUTBOX_OP)),
-                record.get(OUTBOX_CREATED_AT),
+                JdbcTimes.getInstant(record, OUTBOX_CREATED_AT),
                 processedAt,
                 attempts == null ? 0 : attempts,
                 record.get(OUTBOX_LAST_ERROR));

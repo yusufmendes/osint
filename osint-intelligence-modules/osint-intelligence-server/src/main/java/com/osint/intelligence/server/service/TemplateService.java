@@ -39,6 +39,13 @@ public class TemplateService {
 
     @Transactional(readOnly = true)
     public TemplateDto requireById(String id) {
-        return repository.findById(id).orElseThrow(() -> new EntityNotFoundException("Template", id));
+        // Soft-deleted rows must look gone to API consumers; the outbox path uses the repository
+        // directly so it can still observe the deleted flag for Solr eviction.
+        TemplateDto dto = repository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Template", id));
+        if (dto.audit().deleted()) {
+            throw new EntityNotFoundException("Template", id);
+        }
+        return dto;
     }
 }

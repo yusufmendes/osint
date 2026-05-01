@@ -48,7 +48,12 @@ public class AttributeService {
 
     @Transactional(readOnly = true)
     public AttributeDto requireAttribute(String id) {
-        return attributeRepository.findById(id).orElseThrow(() -> new EntityNotFoundException("Attribute", id));
+        AttributeDto dto = attributeRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Attribute", id));
+        if (dto.audit().deleted()) {
+            throw new EntityNotFoundException("Attribute", id);
+        }
+        return dto;
     }
 
     @Transactional(readOnly = true)
@@ -78,7 +83,12 @@ public class AttributeService {
 
     @Transactional(readOnly = true)
     public AttributeTypeValueDto requireValue(String id) {
-        return valueRepository.findById(id).orElseThrow(() -> new EntityNotFoundException("AttributeTypeValue", id));
+        AttributeTypeValueDto dto = valueRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("AttributeTypeValue", id));
+        if (dto.audit().deleted()) {
+            throw new EntityNotFoundException("AttributeTypeValue", id);
+        }
+        return dto;
     }
 
     @Transactional(readOnly = true)

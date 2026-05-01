@@ -135,11 +135,17 @@
 
     <!-- Intelligence static fields-->
 
-    <field name="name" type="string" indexed="true" stored="true" required="true" />
+    <!--
+      The intelligence core stores Intelligence documents only (templates / attributes /
+      attribute_type_values live in Postgres). "name" and "attributeType" therefore have to be
+      optional — they used to be marked required for legacy template/attribute documents that this
+      core no longer ingests, which prevented Intelligence upserts from succeeding at all.
+    -->
+    <field name="name" type="string" indexed="true" stored="true" />
     <field name="creationDate" type="pdate" indexed="true" stored="true" required="true"  />
     <field name="lastModificationDate" type="pdate" indexed="true" stored="true" required="true"  />
 
-    <field name="attributeType" type="string" indexed="true" stored="true" required="true"  />
+    <field name="attributeType" type="string" indexed="true" stored="true"  />
     <field name="attributeValueTypeIdList" type="strings" indexed="true" stored="true"  />
 
     <field name="childTemplateIdList" type="strings" indexed="true" stored="true"  />
@@ -172,7 +178,7 @@
     <dynamicField name="*_is"  type="pints"    indexed="true"  stored="true"/>
 
     <dynamicField name="*_ss"  type="strings"  indexed="true"  stored="true"/>
-    <dynamicField name="*_l"   type="plong"    indexed="true"  stored="true"/>
+    <!-- *_l (plong) is already declared above in the Intelligence dynamic fields block -->
     <dynamicField name="*_ls"  type="plongs"   indexed="true"  stored="true"/>
 
     <dynamicField name="*_bs"  type="booleans" indexed="true"  stored="true"/>
@@ -180,7 +186,7 @@
     <dynamicField name="*_fs"  type="pfloats"  indexed="true"  stored="true"/>
     <dynamicField name="*_d"   type="pdouble"  indexed="true"  stored="true"/>
     <dynamicField name="*_ds"  type="pdoubles" indexed="true"  stored="true"/>
-    <dynamicField name="*_dt"  type="pdate"    indexed="true"  stored="true"/>
+    <!-- *_dt (pdate) is already declared above in the Intelligence dynamic fields block -->
     <dynamicField name="*_dts" type="pdates"   indexed="true"  stored="true"/>
     <dynamicField name="*_t"   type="text_general" indexed="true" stored="true" multiValued="false"/>
     <dynamicField name="*_txt" type="text_general" indexed="true" stored="true"/>

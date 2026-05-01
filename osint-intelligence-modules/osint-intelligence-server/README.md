@@ -82,11 +82,55 @@ Generated types land under `target/generated-sources/jooq` in package `com.osint
 
 ## Tests
 
-Tests use Testcontainers (`postgis/postgis:16-3.4`) and require Docker. SolrJ is mocked at the bean level.
+The module ships with two layers:
+
+### 1. Unit + repository tests (`mvn test` / Surefire)
+
+These reuse Testcontainers `postgis/postgis:16-3.4` and mock SolrJ at the bean level. They exercise repositories, services, and the outbox in isolation.
 
 ```powershell
 mvn -f .\osint-intelligence-modules\osint-intelligence-server\pom.xml test
 ```
+
+### 2. End-to-end REST integration tests (`mvn verify` / Failsafe)
+
+The classes under `src/test/java/com/osint/intelligence/server/e2e/*IT.java` run in the `integration-test` phase. They:
+
+- bring up Postgres + PostGIS (`postgis/postgis:16-3.4`) in Docker via Testcontainers,
+- bring up Solr 9 (`solr:9.10.1`) in Docker, preloaded with the `intelligence` core configset copied from the sibling [`osint-intelligence-solr-server`](../osint-intelligence-solr-server/src/main/resources/conf) module,
+- boot the Spring Boot application **locally** on a random port (in the test JVM, not in Docker),
+- truncate the database tables and wipe the Solr index before every scenario so each test starts from a clean state,
+- send real HTTP/REST requests through RestAssured against every endpoint listed under [Endpoints (MVP)](#endpoints-mvp),
+- and tear down all containers + the application once the JVM exits.
+
+Run them with:
+
+```powershell
+mvn -f .\osint-intelligence-modules\osint-intelligence-server\pom.xml verify
+```
+
+Docker must be running. To execute only the integration tests once the project is compiled:
+
+```powershell
+mvn -f .\osint-intelligence-modules\osint-intelligence-server\pom.xml -Dsurefire.skip=true verify
+```
+
+To target a single E2E class:
+
+```powershell
+mvn -f .\osint-intelligence-modules\osint-intelligence-server\pom.xml -Dit.test=SearchE2EIT verify
+```
+
+Coverage map (every `*IT.java` under the `e2e/` package corresponds to a controller):
+
+| File | Endpoints exercised |
+|------|---------------------|
+| `HealthE2EIT` | `/actuator/health`, `/actuator/info`, `/actuator/metrics` |
+| `TemplateE2EIT` | `GET/POST/PUT/DELETE /api/templates`, `GET /api/templates/{id}` |
+| `AttributeE2EIT` | `GET/POST/PUT/DELETE /api/attributes`, `GET /api/attributes/{id}`, `GET/POST /api/attributes/{id}/values`, `PUT/DELETE /api/attributes/values/{valueId}` |
+| `IntelligenceE2EIT` | `GET/POST/PUT/DELETE /api/intelligence`, `GET /api/intelligence/{id}`, delta sync via `GET /api/intelligence?templateId=&lastQueryTime=` |
+| `GeoE2EIT` | `POST /api/intelligence/within-polygon`, `GET /api/intelligence/near` |
+| `SearchE2EIT` | `GET /api/intelligence/search`, `GET /api/intelligence/search/facets`, `POST /api/intelligence/combined-search` |
 
 ## Layout
 

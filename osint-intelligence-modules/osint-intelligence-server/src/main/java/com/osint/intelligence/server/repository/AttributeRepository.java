@@ -1,6 +1,7 @@
 package com.osint.intelligence.server.repository;
 
 import com.osint.intelligence.model.AttributeType;
+import com.osint.intelligence.server.db.JdbcTimes;
 import com.osint.intelligence.server.dto.AttributeDto;
 import com.osint.intelligence.server.dto.AuditDto;
 import com.osint.intelligence.server.error.OptimisticLockException;
@@ -102,12 +103,12 @@ public class AttributeRepository {
     private AttributeDto map(Record record) {
         String[] vals = record.get(ATTRIBUTE_VALUE_TYPE_IDS);
         AuditDto audit = new AuditDto(
-                record.get(ATTRIBUTE_CREATED_AT),
+                JdbcTimes.getInstant(record, ATTRIBUTE_CREATED_AT),
                 record.get(ATTRIBUTE_CREATED_BY),
-                record.get(ATTRIBUTE_LAST_MODIFIED),
+                JdbcTimes.getInstant(record, ATTRIBUTE_LAST_MODIFIED),
                 record.get(ATTRIBUTE_MODIFIED_BY),
                 Boolean.TRUE.equals(record.get(ATTRIBUTE_DELETED)),
-                record.get(ATTRIBUTE_DELETED_AT),
+                JdbcTimes.getInstant(record, ATTRIBUTE_DELETED_AT),
                 record.get(ATTRIBUTE_DELETED_BY));
         return new AttributeDto(
                 record.get(ATTRIBUTE_ID),
