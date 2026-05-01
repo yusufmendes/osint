@@ -93,17 +93,22 @@ Shade jar + `Dockerfile` ile imaj build:
 mvn -Pdeployment package
 ```
 
-Varsayilan imaj adi: `osint/intelligence-solr:0.1.0` (`docker.image.name` ve
+Varsayilan imaj adi: `osint-intelligence-solr-server:0.1.0` (`docker.image.name` ve
 `project.version` ile uyumlu).
 
 Calistirma:
 
 ```powershell
-docker run -p 8983:8983 osint/intelligence-solr:0.1.0
+docker run -p 8983:8983 osint-intelligence-solr-server:0.1.0
 ```
 
-Container icinde `run-app.sh` once credential jar'ini calistirir, sonra Solr'i
-baslatir; ayrintilar [DesignAndImplementationDetail.md](DesignAndImplementationDetail.md).
+Container icinde `run-app.sh` once credential jar'ini **Dockerfile ile eklenen
+Java 21 JRE** (`JAVA_CREDENTIALS`, varsayilan `/opt/osint/jre-21/bin/java`)
+ile calistirir; Solr ise resmi imajin JVM'i ile `solr-foreground` uzerinden
+baslar. Ayrintilar [DesignAndImplementationDetail.md](DesignAndImplementationDetail.md).
+
+**Not:** `UnsupportedClassVersionError` (61 vs 65) gorursen imaji bu Dockerfile
+ile yeniden build et; eski imajda Java 21 JRE katmani yoktur.
 
 ## Ozet komut tablosu
 
@@ -123,7 +128,7 @@ baslatir; ayrintilar [DesignAndImplementationDetail.md](DesignAndImplementationD
 | `solr.version` | `9.10.1` | Distro indirme + Docker `FROM solr:...` |
 | `solr.core.name` | `intelligence` | Core adi |
 | `solr.port` | `8983` | Yerel start/stop portu |
-| `docker.image.name` | `osint/intelligence-solr` | Docker imaj adi |
+| `docker.image.name` | `osint-intelligence-solr-server` | Docker imaj adi |
 
 ## Frontend ile uyum
 

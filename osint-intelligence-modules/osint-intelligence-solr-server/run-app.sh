@@ -11,9 +11,18 @@ set -euo pipefail
 
 JAR_PATH="${JAR_PATH:-/opt/osint/osint-intelligence-solr-server.jar}"
 CRED_FILE="${CRED_FILE:-/tmp/solr-credentials}"
+# Docker: shaded jar Java 21 bytecode; Solr resmi imajinin PATH'teki java'si genelde 17.
+# Dockerfile /opt/osint/jre-21 altina Temurin 21 JRE kopyalar. Yerel gelistirmede bu script
+# kullanilmadigi icin bu varsayilan sadece container icin gecerlidir.
+JAVA_CREDENTIALS="${JAVA_CREDENTIALS:-/opt/osint/jre-21/bin/java}"
 
-echo "[run-app] credentials uretiliyor: ${CRED_FILE}"
-java -jar "${JAR_PATH}" "${CRED_FILE}"
+if [[ ! -x "${JAVA_CREDENTIALS}" ]]; then
+    echo "[run-app] HATA: credential JVM bulunamadi: ${JAVA_CREDENTIALS}" >&2
+    exit 1
+fi
+
+echo "[run-app] credentials uretiliyor: ${CRED_FILE} (java=${JAVA_CREDENTIALS})"
+"${JAVA_CREDENTIALS}" -jar "${JAR_PATH}" "${CRED_FILE}"
 
 if [[ ! -s "${CRED_FILE}" ]]; then
     echo "[run-app] HATA: ${CRED_FILE} olusturulamadi veya bos." >&2

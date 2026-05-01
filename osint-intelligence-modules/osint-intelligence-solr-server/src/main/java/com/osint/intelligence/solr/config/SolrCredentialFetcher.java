@@ -45,6 +45,6 @@ public final class SolrCredentialFetcher {
                 StandardOpenOption.TRUNCATE_EXISTING,
                 StandardOpenOption.WRITE
         );
-        System.out.println("[SolrCredentialFetcher] credentials yazildi: " + target.toAbsolutePath());
+        System.out.println("[SolrCredentialFetcher] credentials are wrote to : " + target.toAbsolutePath());
     }
 }

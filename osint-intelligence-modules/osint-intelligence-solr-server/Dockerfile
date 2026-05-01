@@ -1,22 +1,32 @@
 # syntax=docker/dockerfile:1.6
 #
 # Solr server imaji:
-#   - Resmi solr:${SOLR_VERSION} baz
+#   - Resmi solr:${SOLR_VERSION} baz (icindeki JVM genelde Java 17 — Solr icin yeterli)
+#   - Ayri bir Java 21 JRE (Eclipse Temurin) /opt/osint/jre-21 altina kopyalanir; yalnizca
+#     SolrCredentialFetcher shaded jar bu JVM ile calisir (class file 65 uyumu).
 #   - Mevcut "solr" kullanicisi yoksa "isr" olusturulur ve data yetkileri verilir
 #   - Proje conf'u + core.properties imajdaki SOLR_HOME (/var/solr/data) altina kopyalanir
 #   - Entry point: run-app.sh -> SolrCredentialFetcher -> /tmp/solr-credentials -> Solr
 #
-# Build: docker build --build-arg SOLR_VERSION=9.10.1 -t osint/intelligence-solr:0.1.0 .
+# Build: docker build --build-arg SOLR_VERSION=9.10.1 -t osint-intelligence-solr-server:0.1.0 .
 # (veya pom.xml -Pdeployment uzerinden mvn package)
 ARG SOLR_VERSION=9.10.1
+# Shaded jar Java 21 ile derlenir; Solr imajinin PATH java'si 17 olabildigi icin credential
+# adimi icin Temurin 21 JRE eklenir (glibc tabanli imaj; solr resmi imaji ile uyumlu).
+ARG CREDENTIALS_JAVA_IMAGE=eclipse-temurin:21-jre
+FROM ${CREDENTIALS_JAVA_IMAGE} AS credentials-jre
+
 FROM solr:${SOLR_VERSION}
 
 ARG SOLR_CORE_NAME=intelligence
 ENV SOLR_CORE_NAME=${SOLR_CORE_NAME}
 ENV CRED_FILE=/tmp/solr-credentials
 ENV JAR_PATH=/opt/osint/osint-intelligence-solr-server.jar
+ENV JAVA_CREDENTIALS=/opt/osint/jre-21/bin/java
 
 USER root
+
+COPY --from=credentials-jre /opt/java/openjdk /opt/osint/jre-21
 
 # Resmi solr imajinda zaten "solr" kullanicisi var; yoksa isr aciliyor ve
 # /var/solr (default SOLR_HOME) sahipligi devrediliyor.
@@ -30,14 +40,6 @@ RUN set -eux; \
     mkdir -p /var/solr/data /opt/osint; \
     chown -R "$RUN_USER":"$RUN_USER" /var/solr /opt/osint; \
     echo "$RUN_USER" > /opt/osint/.run-user
-
-# JRE: resmi solr imaji JRE icerir; gelmemesi durumuna karsi defansif kontrol
-RUN set -eux; \
-    if ! command -v java >/dev/null 2>&1; then \
-        apt-get update; \
-        apt-get install -y --no-install-recommends openjdk-17-jre-headless; \
-        rm -rf /var/lib/apt/lists/*; \
-    fi
 
 # Proje artefaktlari (build context: modul koku)
 COPY target/osint-intelligence-solr-server.jar /opt/osint/osint-intelligence-solr-server.jar

@@ -86,11 +86,19 @@ katmani credential'lari ortama tasir (ileride `SOLR_OPTS` veya
 
 - `ARG SOLR_VERSION` / `FROM solr:${SOLR_VERSION}` — POM `solr.version` ile
   hizali tutulmali.
-- `USER root`: jar, `conf/`, `core.properties`, `run-app.sh` kopyalanir;
+- **Iki JVM:** Resmi Solr imaji genelde **Java 17** ile gelir (Solr icin yeterli).
+  Shaded `SolrCredentialFetcher` jar ise projede **Java 21** (`--release 21`)
+  ile derlenir (class file **65**). Bu uyumsuzluk `UnsupportedClassVersionError`
+  ile patlar. Cozum: multi-stage ile `eclipse-temurin:21-jre` imajindan
+  `/opt/java/openjdk` kopyalanir → `/opt/osint/jre-21`; `run-app.sh` credential
+  adiminda yalnizca `JAVA_CREDENTIALS` (`/opt/osint/jre-21/bin/java`) kullanilir.
+  `solr-foreground` Solr'in kendi scriptleriyle imajdaki JVM'i kullanmaya devam eder.
+- `ARG CREDENTIALS_JAVA_IMAGE` (varsayilan `eclipse-temurin:21-jre`) ile JRE
+  kaynagi build zamaninda degistirilebilir.
+- `USER root`: JRE 21, jar, `conf/`, `core.properties`, `run-app.sh` kopyalanir;
   `/var/solr/data/${SOLR_CORE_NAME}` altina core yerlestirilir.
 - Kullanici: resmi imajda `solr` varsa o; yoksa `isr` kullanici olusturulur
   (belgedeki istege uyum).
-- Opsiyonel: imajda `java` yoksa JRE kurulum denemesi (defansif).
 
 ## `SolrCredentialFetcher`
 

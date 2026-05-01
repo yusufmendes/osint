@@ -6,7 +6,7 @@
 
   Akis ozeti:
     - Default build:
-        * Solr binary zip'i target/solr-${solr.version}/ altina unpack edilir.
+        * Solr binary .tgz distrosu target/solr-${solr.version}/ altina unpack edilir.
         * src/main/resources -> $SOLR_HOME/${solr.core.name}/conf altina senkron.
         * `mvn exec:exec@solr-start` ve `@solr-stop` ile distro start/stop.
     - `-Pseed-conf` profili: unpack edilmis distrodan _default/conf icerigi
@@ -41,7 +41,7 @@
 
         <solr.bin>solr</solr.bin>
 
-        <docker.image.name>osint/intelligence-solr</docker.image.name>
+        <docker.image.name>osint-intelligence-solr-server</docker.image.name>
 
         <maven.compiler.plugin.version>3.13.0</maven.compiler.plugin.version>
         <maven.shade.version>3.6.0</maven.shade.version>
