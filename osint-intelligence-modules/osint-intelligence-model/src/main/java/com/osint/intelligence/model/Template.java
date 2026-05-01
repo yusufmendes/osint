@@ -1,25 +1,100 @@
 package com.osint.intelligence.model;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 /**
  * Reusable intelligence template: nested templates and ordered attributes.
  *
- * @param id                    stable identifier
- * @param version               optimistic-lock / revision counter
- * @param name                  human-readable name
- * @param childTemplateIdList   ids of embedded / child templates
- * @param attributeIdList       ids of {@link Attribute} rows belonging to this template
+ * <p>Mutable bean; list getters return live {@link ArrayList} instances.</p>
  */
-public record Template(
-        String id,
-        long version,
-        String name,
-        List<String> childTemplateIdList,
-        List<String> attributeIdList
-) {
-    public Template {
-        childTemplateIdList = childTemplateIdList == null ? List.of() : List.copyOf(childTemplateIdList);
-        attributeIdList = attributeIdList == null ? List.of() : List.copyOf(attributeIdList);
+public class Template {
+
+    private String id;
+    private long version;
+    private String name;
+    private final List<String> childTemplateIdList = new ArrayList<>();
+    private final List<String> attributeIdList = new ArrayList<>();
+
+    public Template() {}
+
+    public Template(
+            String id,
+            long version,
+            String name,
+            List<String> childTemplateIdList,
+            List<String> attributeIdList) {
+        this.id = id;
+        this.version = version;
+        this.name = name;
+        setChildTemplateIdList(childTemplateIdList);
+        setAttributeIdList(attributeIdList);
+    }
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    public long getVersion() {
+        return version;
+    }
+
+    public void setVersion(long version) {
+        this.version = version;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public List<String> getChildTemplateIdList() {
+        return childTemplateIdList;
+    }
+
+    public void setChildTemplateIdList(List<String> list) {
+        childTemplateIdList.clear();
+        if (list != null) {
+            childTemplateIdList.addAll(list);
+        }
+    }
+
+    public void addChildTemplateId(String templateId) {
+        childTemplateIdList.add(templateId);
+    }
+
+    public void addAllChildTemplateIds(Collection<String> ids) {
+        if (ids != null) {
+            childTemplateIdList.addAll(ids);
+        }
+    }
+
+    public List<String> getAttributeIdList() {
+        return attributeIdList;
+    }
+
+    public void setAttributeIdList(List<String> list) {
+        attributeIdList.clear();
+        if (list != null) {
+            attributeIdList.addAll(list);
+        }
+    }
+
+    public void addAttributeId(String attributeId) {
+        attributeIdList.add(attributeId);
+    }
+
+    public void addAllAttributeIds(Collection<String> ids) {
+        if (ids != null) {
+            attributeIdList.addAll(ids);
+        }
     }
 }
