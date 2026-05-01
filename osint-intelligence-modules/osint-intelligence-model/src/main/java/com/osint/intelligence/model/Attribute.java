@@ -23,7 +23,7 @@ public class Attribute {
     private long version;
     private String name;
     private AttributeType attributeType;
-    private final ArrayList<String> attributeValueTypeIdList = new ArrayList<>();
+    private final List<String> attributeValueTypeIdList = new ArrayList<>();
 
     public Attribute() {}
 
