@@ -38,7 +38,7 @@ intelligence:
     poll-millis: 1000
     batch-size: 100
     max-attempts: 5
-  combined-search:
+  search:
     solr-row-cap: 5000
 
 logging:

@@ -1,9 +1,8 @@
 package com.isr.intelligence.server.service;
 
-import com.isr.intelligence.model.AttributeType;
 import com.isr.intelligence.server.dto.AttributeDto;
-import com.isr.intelligence.server.dto.AttributeTypeValueDto;
 import com.isr.intelligence.server.dto.IntelligenceDto;
+import com.isr.intelligence.server.service.search.SearchFieldNames;
 import org.apache.solr.common.SolrInputDocument;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.Point;
@@ -17,7 +16,8 @@ import java.util.Map;
 
 /**
  * Translates an in-memory {@link IntelligenceDto} (id-keyed JSONB form) into a Solr document with the
- * name-keyed dynamic-field form, using the cache for {@code id -> name} translation.
+ * same id-keyed dynamic-field form. Dynamic Solr fields are named with stable attribute ids so label/name
+ * edits do not orphan old index records.
  */
 @Service
 public class SolrIndexer {
@@ -62,9 +62,8 @@ public class SolrIndexer {
             if (attr == null) {
                 continue;
             }
-            String suffix = suffixFor(attr.attributeType());
-            String fieldName = attr.name() + suffix;
-            Object translated = translateValue(attr.attributeType(), entry.getValue());
+            String fieldName = SearchFieldNames.attributeSolrField(attr.id(), attr.attributeType());
+            Object translated = translateValue(entry.getValue());
             if (translated != null) {
                 doc.setField(fieldName, translated);
             }
@@ -72,56 +71,20 @@ public class SolrIndexer {
         return doc;
     }
 
-    /**
-     * Solr dynamic suffix for the given {@link AttributeType}.
-     */
-    private String suffixFor(AttributeType type) {
-        return switch (type) {
-            case STRING, ENUM -> "_s";
-            case NUMBER -> "_l";
-            case BOOLEAN -> "_b";
-            case DATE -> "_dt";
-            case GEOMETRY, GEOMETRY_LIST -> "_srpt";
-            case ENUM_LIST -> "_ss";
-            case DATE_LIST -> "_dts";
-        };
-    }
-
-    /**
-     * Resolves the storage-form value: for {@link AttributeType#ENUM} / {@link AttributeType#ENUM_LIST} the
-     * {@code AttributeTypeValue.id} -> {@code value} translation runs through the cache; primitives pass
-     * through unchanged.
-     */
-    private Object translateValue(AttributeType type, Object raw) {
+    private Object translateValue(Object raw) {
         if (raw == null) {
             return null;
         }
-        return switch (type) {
-            case ENUM -> resolveEnumValue(raw.toString());
-            case ENUM_LIST -> resolveEnumList(raw);
-            default -> raw;
-        };
-    }
-
-    private String resolveEnumValue(String valueId) {
-        AttributeTypeValueDto v = cache.value(valueId);
-        return v == null ? null : v.value();
-    }
-
-    private List<String> resolveEnumList(Object raw) {
         if (raw instanceof List<?> list) {
             List<String> result = new ArrayList<>(list.size());
             for (Object element : list) {
                 if (element != null) {
-                    String resolved = resolveEnumValue(element.toString());
-                    if (resolved != null) {
-                        result.add(resolved);
-                    }
+                    result.add(element.toString());
                 }
             }
             return result;
         }
-        return List.of();
+        return raw;
     }
 
     private static Date toDate(Instant instant) {

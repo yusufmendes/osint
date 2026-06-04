@@ -246,7 +246,7 @@ After tables exist, V2 adds the indexes the read paths rely on:
 
 | Index | Type | Used by |
 |-------|------|---------|
-| `idx_intelligence_location` | GiST on `location` | `ST_Contains`, `ST_DWithin`, `ST_Intersects` (within-polygon, near) |
+| `idx_intelligence_location` | GiST on `location` | generic `SearchQuery` geo filters: `WITHIN_POLYGON`, `NEAR`, intersections |
 | `idx_intelligence_template_location` | GiST on `(template_id, location)` | template-scoped spatial queries |
 | `idx_intelligence_last_modified_brin` | BRIN on `last_modified` | delta sync: very small index for an append-mostly column |
 | `idx_intelligence_template_last_modified` | btree on `(template_id, last_modified)` | delta sync filtered by template |
@@ -421,7 +421,7 @@ Defaults live in [`application.yml`](src/main/resources/application.yml). All va
 | Outbox poll interval | `1000ms` | `intelligence.outbox.poll-millis` |
 | Outbox batch size | `100` | `intelligence.outbox.batch-size` |
 | Outbox max attempts | `5` | `intelligence.outbox.max-attempts` |
-| Combined-search Solr row cap | `5000` | `intelligence.combined-search.solr-row-cap` |
+| Search Solr row cap | `5000` | `intelligence.search.solr-row-cap` |
 | Hikari pool name | `intel-hikari` | (constant) |
 | Flyway location | `classpath:db/migration` | `spring.flyway.locations` |
 | Flyway baseline-on-migrate | `true` | `spring.flyway.baseline-on-migrate` |
@@ -439,11 +439,7 @@ All write endpoints accept an optional `X-User` header used for the `created_by`
 | `POST` | `/api/intelligence` | create |
 | `PUT` | `/api/intelligence/{id}` | update (optimistic-locked by `version`) |
 | `DELETE` | `/api/intelligence/{id}?version=N` | soft delete |
-| `POST` | `/api/intelligence/within-polygon` | `{ templateId?, polygonWkt }`, uses GiST + `ST_Contains` |
-| `GET` | `/api/intelligence/near?lat=&lon=&km=&templateId=` | `ST_DWithin` over geography |
-| `GET` | `/api/intelligence/search?q=...&templateId=` | Solr full-text |
-| `GET` | `/api/intelligence/search/facets?templateId=&fields=...` | Solr facets |
-| `POST` | `/api/intelligence/combined-search` | text (Solr) + polygon (PG) — runs both in parallel and intersects ids |
+| `POST` | `/api/intelligence/search` | generic `SearchQuery`: fieldless `q`, structured filters, facets, geo (`WITHIN_POLYGON`, `NEAR`) |
 | `GET` `POST` `PUT` `DELETE` | `/api/templates`, `/api/attributes`, `/api/attributes/{id}/values` | reference data CRUD |
 | `GET` | `/actuator/health`, `/actuator/info`, `/actuator/metrics` | ops |
 
@@ -500,8 +496,7 @@ Coverage map (every `*IT.java` under the `e2e/` package corresponds to a control
 | `TemplateE2EIT` | `GET/POST/PUT/DELETE /api/templates`, `GET /api/templates/{id}` |
 | `AttributeE2EIT` | `GET/POST/PUT/DELETE /api/attributes`, `GET /api/attributes/{id}`, `GET/POST /api/attributes/{id}/values`, `PUT/DELETE /api/attributes/values/{valueId}` |
 | `IntelligenceE2EIT` | `GET/POST/PUT/DELETE /api/intelligence`, `GET /api/intelligence/{id}`, delta sync via `GET /api/intelligence?templateId=&lastQueryTime=` |
-| `GeoE2EIT` | `POST /api/intelligence/within-polygon`, `GET /api/intelligence/near` |
-| `SearchE2EIT` | `GET /api/intelligence/search`, `GET /api/intelligence/search/facets`, `POST /api/intelligence/combined-search` |
+| `SearchE2EIT` | `POST /api/intelligence/search` for full text, dynamic enum filters, facets, combined q+geo, geo-only near, and `lastQueryTime` |
 
 ---
 
@@ -525,7 +520,7 @@ isr-intelligence-server/
     │   │   ├── outbox/             — OutboxWorker (@Scheduled)
     │   │   ├── repository/         — jOOQ repositories
     │   │   └── service/            — orchestration (IntelligenceService,
-    │   │                              CombinedSearchService, SolrIndexer, …)
+    │   │                              GenericSearchService, SolrIndexer, …)
     │   └── resources/
     │       ├── application.yml
     │       ├── logback-spring.xml

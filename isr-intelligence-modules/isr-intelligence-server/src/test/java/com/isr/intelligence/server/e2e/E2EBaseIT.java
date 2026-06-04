@@ -27,6 +27,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
 
+import static org.awaitility.Awaitility.await;
+
 /**
  * Base class for E2E integration tests.
  *
@@ -143,6 +145,9 @@ public abstract class E2EBaseIT {
         for (int i = 0; i < 5 && outboxRepository.pendingCount() > 0; i++) {
             outboxWorker.processBatch();
         }
+        await().atMost(Duration.ofSeconds(5))
+                .pollInterval(Duration.ofMillis(100))
+                .until(() -> outboxRepository.pendingCount() == 0);
     }
 
     /**

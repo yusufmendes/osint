@@ -1,5 +1,6 @@
 package com.isr.intelligence.server.service;
 
+import com.isr.intelligence.server.service.search.SolrRawCommand;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.response.FacetField;
@@ -9,10 +10,7 @@ import org.apache.solr.common.SolrDocumentList;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 @Service
 public class SolrSearchService {
@@ -26,14 +24,9 @@ public class SolrSearchService {
     /**
      * Returns a map preserving Solr's score order, mapping intelligence id -> relevance score.
      */
-    public Map<String, Float> idsByQuery(String q, String templateId, int rows) throws Exception {
-        SolrQuery query = new SolrQuery();
-        query.setQuery(q == null || q.isBlank() ? "*:*" : q);
-        if (templateId != null && !templateId.isBlank()) {
-            query.addFilterQuery("templateId:\"" + escape(templateId) + "\"");
-        }
+    public SolrIdResult idsByCommand(SolrRawCommand command) throws Exception {
+        SolrQuery query = toSolrQuery(command);
         query.setFields("id", "score");
-        query.setRows(rows);
 
         QueryResponse response = solrClient.query(query);
         SolrDocumentList docs = response.getResults();
@@ -45,29 +38,55 @@ public class SolrSearchService {
                 ordered.put(id, score == null ? 0f : score);
             }
         }
-        return ordered;
+        return new SolrIdResult(ordered, docs.getNumFound());
     }
 
-    public Set<String> idsByQuerySet(String q, String templateId, int rows) throws Exception {
-        return new LinkedHashSet<>(idsByQuery(q, templateId, rows).keySet());
-    }
-
-    public List<FacetField> facets(String templateId, List<String> facetFields) throws Exception {
-        SolrQuery query = new SolrQuery();
-        query.setQuery("*:*");
-        if (templateId != null && !templateId.isBlank()) {
-            query.addFilterQuery("templateId:\"" + escape(templateId) + "\"");
-        }
+    public Map<String, Map<String, Long>> facetsByCommand(SolrRawCommand command) throws Exception {
+        SolrQuery query = toSolrQuery(command.withRows(0, 0));
         query.setRows(0);
         query.setFacet(true);
         query.setFacetMinCount(1);
-        for (String f : facetFields) {
-            query.addFacetField(f);
+        for (String field : command.facetLogicalNamesBySolrField().keySet()) {
+            query.addFacetField(field);
         }
-        return solrClient.query(query).getFacetFields();
+
+        QueryResponse response = solrClient.query(query);
+        Map<String, Map<String, Long>> result = new LinkedHashMap<>();
+        if (response.getFacetFields() == null) {
+            return result;
+        }
+        for (FacetField facetField : response.getFacetFields()) {
+            String logicalName = command.facetLogicalNamesBySolrField()
+                    .getOrDefault(facetField.getName(), facetField.getName());
+            Map<String, Long> bucket = new LinkedHashMap<>();
+            if (facetField.getValues() != null) {
+                for (FacetField.Count count : facetField.getValues()) {
+                    bucket.put(count.getName(), count.getCount());
+                }
+            }
+            result.put(logicalName, bucket);
+        }
+        return result;
     }
 
-    private static String escape(String s) {
-        return s.replace("\\", "\\\\").replace("\"", "\\\"");
+    private SolrQuery toSolrQuery(SolrRawCommand command) {
+        SolrQuery query = new SolrQuery();
+        query.setQuery(command.query());
+        query.setStart(command.start());
+        query.setRows(command.rows());
+        for (String filter : command.filterQueries()) {
+            query.addFilterQuery(filter);
+        }
+        if (!"*:*".equals(command.query())) {
+            query.setParam("defType", "edismax");
+            query.setParam("qf", "_text_");
+            query.setParam("uf", "-*");
+        }
+        if (command.sortField() != null && !command.sortField().isBlank()) {
+            query.setSort(command.sortField(), command.sortAsc() ? SolrQuery.ORDER.asc : SolrQuery.ORDER.desc);
+        }
+        return query;
     }
+
+    public record SolrIdResult(Map<String, Float> scoresById, long total) {}
 }

@@ -51,7 +51,7 @@ class SolrIndexerTest {
 
         assertThat(doc.getFieldValue("id")).isEqualTo("intel-1");
         assertThat(doc.getFieldValue("templateId")).isEqualTo("templateId");
-        assertThat(doc.getFieldValue("gender_s")).isEqualTo("FEMALE");
+        assertThat(doc.getFieldValue("attr_67656e6465724964_enum")).isEqualTo("femaleId");
     }
 
     @Test
@@ -73,8 +73,8 @@ class SolrIndexerTest {
                 "templateId", List.of(), attrs, AuditDto.initial(Instant.now(), null));
 
         SolrInputDocument doc = new SolrIndexer(cache).toSolrDocument(dto);
-        assertThat(doc.getFieldValue("weight_l")).isEqualTo(75);
-        assertThat(doc.getFieldValue("active_b")).isEqualTo(true);
+        assertThat(doc.getFieldValue("attr_7765696768744964_l")).isEqualTo(75);
+        assertThat(doc.getFieldValue("attr_6163746976654964_b")).isEqualTo(true);
     }
 
     @Test
@@ -96,7 +96,7 @@ class SolrIndexerTest {
                 "templateId", List.of(), attrs, AuditDto.initial(Instant.now(), null));
 
         SolrInputDocument doc = new SolrIndexer(cache).toSolrDocument(dto);
-        assertThat(doc.getFieldValues("tags_ss")).containsExactly("RED", "BLUE");
+        assertThat(doc.getFieldValues("attr_746167734964_enums")).containsExactly("redId", "blueId");
     }
 
     @Test

@@ -91,7 +91,7 @@ class OutboxWorkerIT extends AbstractPostgisIT {
         Mockito.verify(solrClient).add(captor.capture());
         SolrInputDocument doc = captor.getValue().iterator().next();
         assertThat(doc.getFieldValue("templateId")).isEqualTo(template.id());
-        assertThat(doc.getFieldValue("gender_s")).isEqualTo("FEMALE");
+        assertThat(doc.getFieldValue("attr_" + toHex(gender.id()) + "_enum")).isEqualTo(female.id());
 
         assertThat(outboxRepository.pendingCount()).isEqualTo(0L);
     }
@@ -113,5 +113,13 @@ class OutboxWorkerIT extends AbstractPostgisIT {
 
         Mockito.verify(solrClient).deleteById(any(List.class));
         Mockito.verify(solrClient).commit();
+    }
+
+    private static String toHex(String value) {
+        StringBuilder result = new StringBuilder(value.length() * 2);
+        for (byte b : value.getBytes(java.nio.charset.StandardCharsets.UTF_8)) {
+            result.append(String.format("%02x", b));
+        }
+        return result.toString();
     }
 }

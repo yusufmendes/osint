@@ -27,7 +27,9 @@ public class AttributeCacheService {
     private final AtomicLong valuesGeneration = new AtomicLong();
 
     private volatile Map<String, AttributeDto> attributesById = Map.of();
+    private volatile Map<String, AttributeDto> attributesByName = Map.of();
     private volatile Map<String, AttributeTypeValueDto> valuesById = Map.of();
+    private volatile Map<String, AttributeTypeValueDto> valuesByAttributeAndLabel = Map.of();
 
     public AttributeCacheService(
             AttributeRepository attributeRepository,
@@ -44,6 +46,15 @@ public class AttributeCacheService {
         return reloadAttributesAndGet(id);
     }
 
+    public AttributeDto attributeByName(String name) {
+        AttributeDto cached = attributesByName.get(name);
+        if (cached != null) {
+            return cached;
+        }
+        reloadAttributesAndGet(null);
+        return attributesByName.get(name);
+    }
+
     public AttributeTypeValueDto value(String id) {
         AttributeTypeValueDto cached = valuesById.get(id);
         if (cached != null) {
@@ -52,26 +63,56 @@ public class AttributeCacheService {
         return reloadValuesAndGet(id);
     }
 
-    public void invalidateAttributes() { attributesGeneration.incrementAndGet(); attributesById = Map.of(); }
-    public void invalidateValues() { valuesGeneration.incrementAndGet(); valuesById = Map.of(); }
+    public AttributeTypeValueDto valueByAttributeAndLabel(String attributeId, String label) {
+        AttributeTypeValueDto byId = value(label);
+        if (byId != null && byId.attributeId().equals(attributeId)) {
+            return byId;
+        }
+        reloadValuesAndGet(null);
+        return valuesByAttributeAndLabel.get(attributeValueKey(attributeId, label));
+    }
+
+    public void invalidateAttributes() {
+        attributesGeneration.incrementAndGet();
+        attributesById = Map.of();
+        attributesByName = Map.of();
+    }
+
+    public void invalidateValues() {
+        valuesGeneration.incrementAndGet();
+        valuesById = Map.of();
+        valuesByAttributeAndLabel = Map.of();
+    }
 
     private synchronized AttributeDto reloadAttributesAndGet(String id) {
-        if (attributesById.containsKey(id)) {
+        if (id != null && attributesById.containsKey(id)) {
             return attributesById.get(id);
         }
         Map<String, AttributeDto> reloaded = attributeRepository.findAllActive().stream()
                 .collect(Collectors.toMap(AttributeDto::id, a -> a, (a, b) -> b, ConcurrentHashMap::new));
         attributesById = reloaded;
-        return reloaded.get(id);
+        attributesByName = reloaded.values().stream()
+                .collect(Collectors.toMap(AttributeDto::name, a -> a, (a, b) -> b, ConcurrentHashMap::new));
+        return id == null ? null : reloaded.get(id);
     }
 
     private synchronized AttributeTypeValueDto reloadValuesAndGet(String id) {
-        if (valuesById.containsKey(id)) {
+        if (id != null && valuesById.containsKey(id)) {
             return valuesById.get(id);
         }
         Map<String, AttributeTypeValueDto> reloaded = attributeTypeValueRepository.findAllActive().stream()
                 .collect(Collectors.toMap(AttributeTypeValueDto::id, v -> v, (a, b) -> b, ConcurrentHashMap::new));
         valuesById = reloaded;
-        return reloaded.get(id);
+        valuesByAttributeAndLabel = reloaded.values().stream()
+                .collect(Collectors.toMap(
+                        v -> attributeValueKey(v.attributeId(), v.value()),
+                        v -> v,
+                        (a, b) -> b,
+                        ConcurrentHashMap::new));
+        return id == null ? null : reloaded.get(id);
+    }
+
+    private static String attributeValueKey(String attributeId, String value) {
+        return attributeId + "\u0000" + value;
     }
 }

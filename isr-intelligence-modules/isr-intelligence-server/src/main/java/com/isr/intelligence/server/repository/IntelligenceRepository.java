@@ -7,6 +7,7 @@ import com.isr.intelligence.server.db.JsonbSupport;
 import com.isr.intelligence.server.dto.AuditDto;
 import com.isr.intelligence.server.dto.IntelligenceDto;
 import com.isr.intelligence.server.error.OptimisticLockException;
+import com.isr.intelligence.server.service.search.PostgresSearchQuery;
 import org.jooq.Condition;
 import org.jooq.DSLContext;
 import org.jooq.Field;
@@ -168,6 +169,29 @@ public class IntelligenceRepository {
         return baseSelect()
                 .where(INTELLIGENCE_ID.in(ids))
                 .fetch(this::map);
+    }
+
+    @Transactional(readOnly = true)
+    public List<IntelligenceDto> search(PostgresSearchQuery query) {
+        return baseSelect()
+                .where(query.condition())
+                .orderBy(query.sortFields())
+                .offset(query.offset())
+                .limit(query.limit())
+                .fetch(this::map);
+    }
+
+    @Transactional(readOnly = true)
+    public List<String> findIds(Condition condition) {
+        return dsl.select(INTELLIGENCE_ID)
+                .from(INTELLIGENCE)
+                .where(condition == null ? DSL.trueCondition() : condition)
+                .fetch(INTELLIGENCE_ID);
+    }
+
+    @Transactional(readOnly = true)
+    public long count(Condition condition) {
+        return dsl.fetchCount(INTELLIGENCE, condition == null ? DSL.trueCondition() : condition);
     }
 
     /**

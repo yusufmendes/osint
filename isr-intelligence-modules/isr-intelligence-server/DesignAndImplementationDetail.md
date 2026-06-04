@@ -215,13 +215,13 @@ When the same data lives in two stores, a write that succeeds in one and fails i
 
 A row written to Postgres becomes visible in Solr only after the outbox worker runs (sub-second under normal load). The client can show its own write immediately (optimistic UI); the backend reconciles in the background.
 
-### 2.4 Combined Search: geo + full-text + dynamic attributes in one request
+### 2.4 Generic Search: geo + full-text + dynamic attributes in one request
 
-Users want to combine a polygon drawn on the map, a free-text query and dynamic attribute filters in a single search. These three filters live in different stores: geo -> PostGIS, text + dynamic attr -> Solr. No single store solves it.
+Users want to combine a polygon drawn on the map, a free-text query and dynamic attribute filters in a single search. The request enters through a single `SearchQuery` contract, then the backend decides which store should answer each part: geo and PG-only filters -> PostGIS/PostgreSQL, fieldless text and Solr-safe filters -> Solr.
 
-**Solution: backend orchestration (parallel queries + id intersection)**
+**Solution: resolver + converters + backend orchestration**
 
-The backend issues both queries in parallel: Solr returns id+score; PostGIS returns id set. The backend intersects the two id sets and hydrates the rows from Postgres. Polygon usually shrinks the PG side dramatically, so the intersection is cheap.
+`SearchFieldResolver` normalizes built-in fields and dynamic attribute names to stable PG/Solr fields. `SearchQueryToSolrRawCommand` and `SearchQueryToPostgresQuery` produce store-specific commands. `GenericSearchService` runs PostgreSQL-only, Solr-only, or combined Solr + PostGIS/id-intersection depending on the resolved query shape.
 
 ### 2.5 Delta sync and delete detection
 
@@ -374,32 +374,37 @@ GET /api/intelligence?templateId=X[&lastQueryTime=Y]
       -> response { records: [...], serverTime: ISO-8601 }
 ```
 
-### 6.3 Combined search flow (geo + text + dyn-attr)
+### 6.3 Generic search flow (text + structured filters + geo + facets)
 
 ```
-Browser (polygon WKT + q="..." + filters={source:"isr", date>"2024-01-01"})
-  -> POST /api/intelligence/combined-search
-  -> CombinedSearchService
-      -> CompletableFuture.allOf(
-          Solr query (q, fq=templateId:X, fq=source_s:isr, fq=date_dt:[2024-01-01 TO *],
-                      fl=id,score, rows=5000) -> Map<id, score>,
-          PostGIS query (template_id = X AND ST_Contains(polygon, geom)) -> Set<id>
-         )
-      -> matchedIds = solrIds ∩ geoIds
-      -> hydrate rows from Postgres WHERE id IN (matchedIds)
-      -> sort by Solr score
-      -> response { records: [...], total: N }
+Browser (q="...", queryHolders=[templateId, source, polygon], facets=[status])
+  -> POST /api/intelligence/search
+  -> SearchController.search(SearchQuery)
+  -> GenericSearchService.searchQuery(SearchQuery)
+      -> SearchFieldResolver:
+         - built-in fields: templateId, lastQueryTime, location, etc.
+         - dynamic fields: attribute name -> attribute id -> Solr stable field
+         - enum values: public label/id -> AttributeTypeValue.id
+      -> SearchQueryToSolrRawCommand for fieldless full text and Solr-safe filters
+      -> SearchQueryToPostgresQuery for structured, JSONB, and PostGIS filters
+      -> route:
+         - only geo/PG filters: Postgres search
+         - q plus Solr-safe filters: Solr ids + Postgres hydration
+         - q plus geo/PG-only filters: Solr ids and PG ids in parallel, intersect, hydrate
+      -> response { records: [...], facets: {...}, total: N }
 ```
 
 #### Edge cases
 
 | Situation | Behaviour |
 |-----------|-----------|
-| Polygon missing, only text/attr | Solr only; geo step skipped |
-| Text/attr missing, only polygon | PostGIS only (`ST_Contains`); Solr step skipped |
-| Solr returns 0 hits | Intersection empty; no PG hydration |
-| Solr returns 5000 hits (cap) | Add response header `X-Result-Capped: true` |
-| Both supplied | Parallel query + intersection |
+| Only dynamic/built-in structured filters | PostgreSQL query with JSONB / column predicates |
+| Only geo filters | PostgreSQL + PostGIS (`ST_Contains`, `ST_DWithin`) |
+| Only q | Solr fieldless full text, then PostgreSQL hydration |
+| q plus Solr-safe filters | Solr full text + filter queries, then PostgreSQL hydration |
+| q plus geo or PG-only filters | Solr ids and PostgreSQL ids in parallel, id intersection, hydration |
+| Facets requested | Same `SearchQuery`; facets are computed over the resolved Solr filter context |
+| Solr returns the configured row cap | Results are bounded by `intelligence.search.solr-row-cap` |
 
 ---
 
@@ -506,11 +511,7 @@ private Map<Field<?>, Object> auditCreate(String user, OffsetDateTime now) {
 | `POST` | `/api/intelligence` | PostgreSQL + outbox -> Solr | create |
 | `PUT` | `/api/intelligence/{id}` | PostgreSQL + outbox -> Solr | update |
 | `DELETE` | `/api/intelligence/{id}` | PostgreSQL + outbox -> Solr | soft delete |
-| `GET` | `/api/intelligence/search?q=...&template=...` | Solr (SolrJ) | full-text |
-| `GET` | `/api/intelligence/search/facets?template=...` | Solr | faceted aggregation |
-| `POST` | `/api/intelligence/combined-search` | Solr + PostGIS parallel -> id intersection -> PG | section 6.3 |
-| `POST` | `/api/intelligence/within-polygon` | PG + PostGIS (jOOQ) | `ST_Contains`, body=WKT |
-| `GET` | `/api/intelligence/near?lat=..&lon=..&km=..` | PG + PostGIS (jOOQ) | `ST_DWithin` |
+| `POST` | `/api/intelligence/search` | GenericSearchService -> Solr / PostgreSQL / PostGIS | one `SearchQuery` endpoint for fieldless full-text, structured filters, facets, `WITHIN_POLYGON`, and `NEAR` |
 | `GET` | `/api/templates` | PostgreSQL | list all templates |
 | `GET` | `/api/templates/{id}/attributes` | PostgreSQL | attributes for a template |
 | `GET` | `/actuator/health` | actuator | PG + Solr health |
@@ -608,12 +609,12 @@ random_page_cost = 1.1   # SSD; use 4.0 for HDD
 - `intelligence_outbox` table + unprocessed partial index.
 - `OutboxWorker` (`@Scheduled`): batch read with `SELECT ... FOR UPDATE SKIP LOCKED`, SolrJ add/delete, retry + backoff.
 - SolrJ client `@Bean`.
-- `PostGIS` helper class (`stContains`, `stDWithin`, `stMakePoint`).
-- `GeoQueryRepository` exposing `withinPolygon(geometry, templateId)` and `near(lat, lon, km, templateId)`.
-- Endpoints: `POST /api/intelligence/within-polygon`, `GET /api/intelligence/near`.
-- Solr full-text endpoint: `GET /api/intelligence/search`.
-- `CombinedSearchService`: `CompletableFuture.allOf` of Solr + PostGIS, intersect, hydrate, sort by score; edge cases per section 6.3.
-- `POST /api/intelligence/combined-search`.
+- `PostGIS` helper usage through the generic PostgreSQL search converter (`ST_Contains`, `ST_DWithin`, `ST_MakePoint`).
+- `SearchQuery`, `QueryHolder`, `QueryOperator`, and `QueryOperand` DTOs as the public search contract.
+- `SearchFieldResolver` resolving built-in fields and dynamic attribute names to stable Solr / PostgreSQL fields.
+- `SearchQueryToSolrRawCommand` and `SearchQueryToPostgresQuery` converters.
+- `GenericSearchService.searchQuery(SearchQuery)` routing Solr-only, PostgreSQL-only, and combined Solr + PostGIS searches.
+- Single endpoint: `POST /api/intelligence/search`.
 - Basic outbox-lag metric.
 
 ### Phase 3: Delta sync + client cache
