@@ -1,0 +1,50 @@
+{
+  "name": "isr-web-core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared types, utilities and auth primitives consumed by every web module.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./types": "./src/types/AppModule.ts",
+    "./auth": "./src/auth/useCurrentUser.ts"
+  },
+  "scripts": {
+    "lint": "eslint src --ext .ts,.tsx",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "build": "echo 'isr-web-core is consumed from source - no build step (per spec section 6).'"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0 || ^18.3.0",
+    "react-dom": "^19.0.0 || ^18.3.0",
+    "react-redux": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "eslint": "^9.0.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-react": "^7.35.0",
+    "eslint-plugin-react-hooks": "^5.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-redux": "^9.0.0",
+    "vitest": "^3.0.0",
+    "typescript": "^5.6.0"
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=10"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "protobufjs"
+    ]
+  }
+}

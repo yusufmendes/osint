@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Thin aggregator for the ISR MVP backend(s).
+  Each backend module is its own self-contained git repository (no
+  <parent>/<dependencyManagement> coupling). This file lets you run, e.g.:
+
+      mvn -f isr-mvp\pom.xml verify
+
+  from the workspace root and have Maven traverse into sibling backend
+  repositories. Sibling repos must be checked out alongside `isr-mvp/`:
+
+      <workspace-root>/
+      ├─ isr-mvp/                      (this aggregator)
+      └─ isr-auth-modules/
+         └─ isr-auth-backend/
+
+  If you only want to build a single backend, you can also `cd` into it and
+  run `mvn` directly - the child POM is fully self-contained.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.isr</groupId>
+  <artifactId>isr-mvp-aggregator</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+  <packaging>pom</packaging>
+  <name>ISR MVP - Aggregator</name>
+
+  <modules>
+    <module>../isr-auth-modules/isr-auth-backend</module>
+  </modules>
+</project>

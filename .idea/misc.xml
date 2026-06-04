@@ -7,6 +7,12 @@
         <option value="$PROJECT_DIR$/osint-auth-modules/osint-auth-backend/pom.xml" />
         <option value="$PROJECT_DIR$/osint-intelligence-modules/osint-intelligence-solr-server/pom.xml" />
         <option value="$PROJECT_DIR$/osint-intelligence-modules/osint-intelligence-model/pom.xml" />
+        <option value="$PROJECT_DIR$/osint-intelligence-modules/osint-intelligence-server/pom.xml" />
+        <option value="$PROJECT_DIR$/isr-auth-modules/isr-auth-backend/pom.xml" />
+        <option value="$PROJECT_DIR$/isr-intelligence-modules/isr-intelligence-model/pom.xml" />
+        <option value="$PROJECT_DIR$/isr-intelligence-modules/isr-intelligence-server/pom.xml" />
+        <option value="$PROJECT_DIR$/isr-intelligence-modules/isr-intelligence-solr-server/pom.xml" />
+        <option value="$PROJECT_DIR$/isr-mvp/pom.xml" />
       </list>
     </option>
   </component>

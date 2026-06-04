@@ -2,6 +2,13 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
+      <module fileurl="file://$PROJECT_DIR$/isr-gis-modules/isr-gis-web/isr-gis-web.iml" filepath="$PROJECT_DIR$/isr-gis-modules/isr-gis-web/isr-gis-web.iml" />
+      <module fileurl="file://$PROJECT_DIR$/isr-intelligence-modules/isr-intelligence-web/isr-intelligence-web.iml" filepath="$PROJECT_DIR$/isr-intelligence-modules/isr-intelligence-web/isr-intelligence-web.iml" />
+      <module fileurl="file://$PROJECT_DIR$/isr-mvp/isr-mvp-web-shell/isr-mvp-web-shell.iml" filepath="$PROJECT_DIR$/isr-mvp/isr-mvp-web-shell/isr-mvp-web-shell.iml" />
+      <module fileurl="file://$PROJECT_DIR$/isr-search-modules/isr-search-web/isr-search-web.iml" filepath="$PROJECT_DIR$/isr-search-modules/isr-search-web/isr-search-web.iml" />
+      <module fileurl="file://$PROJECT_DIR$/isr-tools/isr-tools.iml" filepath="$PROJECT_DIR$/isr-tools/isr-tools.iml" />
+      <module fileurl="file://$PROJECT_DIR$/isr-video-modules/isr-video-web/isr-video-web.iml" filepath="$PROJECT_DIR$/isr-video-modules/isr-video-web/isr-video-web.iml" />
+      <module fileurl="file://$PROJECT_DIR$/isr-core-modules/isr-web-core/isr-web-core.iml" filepath="$PROJECT_DIR$/isr-core-modules/isr-web-core/isr-web-core.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/osint.iml" filepath="$PROJECT_DIR$/.idea/osint.iml" />
       <module fileurl="file://$PROJECT_DIR$/osint-gis-modules/osint-gis-web/osint-gis-web.iml" filepath="$PROJECT_DIR$/osint-gis-modules/osint-gis-web/osint-gis-web.iml" />
       <module fileurl="file://$PROJECT_DIR$/osint-intelligence-modules/osint-intelligence-web/osint-intelligence-web.iml" filepath="$PROJECT_DIR$/osint-intelligence-modules/osint-intelligence-web/osint-intelligence-web.iml" />

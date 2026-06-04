@@ -1,0 +1,20 @@
+isr:
+  auth:
+    jwt-secret: test-secret-test-secret-test-secret-test-secret-please
+    jwt-ttl-minutes: 30
+    cors-allowed-origins:
+      - http://localhost:5173
+    users:
+      - username: admin
+        password: admin123
+        permissions:
+          - gis.map.view
+          - gis.layers.view
+          - video.player.view
+          - intelligence.crud.view
+          - search.panel.view
+      - username: viewer
+        password: viewer123
+        permissions:
+          - gis.map.view
+          - search.panel.view

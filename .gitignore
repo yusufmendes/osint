@@ -1,2 +1,19 @@
 /.idea/
-/.idea/
+
+# ISR toolchain and verification outputs
+/isr-tools/.tools/
+
+# Java/Maven outputs
+**/target/
+
+# Frontend outputs and dependency caches
+**/node_modules/
+**/dist/
+**/build/
+**/out/
+**/coverage/
+**/.vite/
+**/.turbo/
+**/.next/
+**/.nuxt/
+**/.output/

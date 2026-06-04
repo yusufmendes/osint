@@ -1,0 +1,98 @@
+package com.isr.intelligence.server.service;
+
+import com.isr.intelligence.server.dto.AttributeDto;
+import com.isr.intelligence.server.dto.AttributeTypeValueDto;
+import com.isr.intelligence.server.error.EntityNotFoundException;
+import com.isr.intelligence.server.repository.AttributeRepository;
+import com.isr.intelligence.server.repository.AttributeTypeValueRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+
+@Service
+public class AttributeService {
+
+    private final AttributeRepository attributeRepository;
+    private final AttributeTypeValueRepository valueRepository;
+    private final AttributeCacheService cache;
+
+    public AttributeService(
+            AttributeRepository attributeRepository,
+            AttributeTypeValueRepository valueRepository,
+            AttributeCacheService cache) {
+        this.attributeRepository = attributeRepository;
+        this.valueRepository = valueRepository;
+        this.cache = cache;
+    }
+
+    @Transactional
+    public AttributeDto createAttribute(AttributeDto dto, String user) {
+        AttributeDto saved = attributeRepository.insert(dto, user);
+        cache.invalidateAttributes();
+        return saved;
+    }
+
+    @Transactional
+    public AttributeDto updateAttribute(AttributeDto dto, String user) {
+        AttributeDto saved = attributeRepository.update(dto, user);
+        cache.invalidateAttributes();
+        return saved;
+    }
+
+    @Transactional
+    public void softDeleteAttribute(String id, long expectedVersion, String user) {
+        attributeRepository.softDelete(id, expectedVersion, user);
+        cache.invalidateAttributes();
+    }
+
+    @Transactional(readOnly = true)
+    public AttributeDto requireAttribute(String id) {
+        AttributeDto dto = attributeRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Attribute", id));
+        if (dto.audit().deleted()) {
+            throw new EntityNotFoundException("Attribute", id);
+        }
+        return dto;
+    }
+
+    @Transactional(readOnly = true)
+    public List<AttributeDto> findAllActive() {
+        return attributeRepository.findAllActive();
+    }
+
+    @Transactional
+    public AttributeTypeValueDto createValue(AttributeTypeValueDto dto, String user) {
+        AttributeTypeValueDto saved = valueRepository.insert(dto, user);
+        cache.invalidateValues();
+        return saved;
+    }
+
+    @Transactional
+    public AttributeTypeValueDto updateValue(AttributeTypeValueDto dto, String user) {
+        AttributeTypeValueDto saved = valueRepository.update(dto, user);
+        cache.invalidateValues();
+        return saved;
+    }
+
+    @Transactional
+    public void softDeleteValue(String id, long expectedVersion, String user) {
+        valueRepository.softDelete(id, expectedVersion, user);
+        cache.invalidateValues();
+    }
+
+    @Transactional(readOnly = true)
+    public AttributeTypeValueDto requireValue(String id) {
+        AttributeTypeValueDto dto = valueRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("AttributeTypeValue", id));
+        if (dto.audit().deleted()) {
+            throw new EntityNotFoundException("AttributeTypeValue", id);
+        }
+        return dto;
+    }
+
+    @Transactional(readOnly = true)
+    public List<AttributeTypeValueDto> findValuesForAttribute(String attributeId) {
+        return valueRepository.findByAttributeId(attributeId);
+    }
+}
